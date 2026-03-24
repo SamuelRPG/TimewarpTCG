@@ -22,4 +22,47 @@ public class GameState {
         this.turnNumber = Turn.of(0);
         this.activePlayerId = playerA.getPlayerId();
     }
+
+    public void switchPriority() {
+            playerA.setPriority(!playerA.hasPriority());
+            playerB.setPriority(!playerB.hasPriority());
+
+            this.activePlayerId = playerA.hasPriority() ? playerA.getPlayerId() : playerB.getPlayerId();
+    }
+
+    public List<Card> getAllCardsInGame() {
+        return allCardsInGame;
+    }
+
+    public void setAllCardsInGame(List<Card> allCardsInGame) {
+        this.allCardsInGame = allCardsInGame;
+    }
+
+    public Turn getTurnNumber() {
+        return turnNumber;
+    }
+
+    public void setTurnNumber(Turn turnNumber) {
+        this.turnNumber = turnNumber;
+    }
+
+    public PlayerState getPlayerB() {
+        return playerB;
+    }
+
+    public PlayerState getPlayerA() {
+        return playerA;
+    }
+
+    public UUID getActivePlayerId() {
+        return activePlayerId;
+    }
+
+    public void setActivePlayerId(UUID activePlayerId) {
+        this.activePlayerId = activePlayerId;
+    }
+
+    public UUID getGameId() {
+        return gameId;
+    }
 }

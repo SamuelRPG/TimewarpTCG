@@ -66,4 +66,9 @@ public class Card {
     public boolean isAlive() {
         return !destroyed;
     }
+
+    // getter y setter //
+    public Drive getDrive() {
+        return drive;
+    }
 }

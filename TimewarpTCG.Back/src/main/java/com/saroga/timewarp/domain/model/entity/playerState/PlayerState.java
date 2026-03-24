@@ -33,7 +33,6 @@ public class PlayerState {
         this.base = new ArrayList<>();
         this.fieldLeft = new ArrayList<>();
         this.fieldRight = new ArrayList<>();
-
     }
 
     public Score getPoints() {
