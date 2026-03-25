@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GameStateTest {
@@ -85,5 +85,54 @@ class GameStateTest {
         assertThrows(IllegalStateException.class, () -> {
             player.setResource(player.getResource().spend(expensiveCardCost));
         }, "Debería haber lanzado una excepción por falta de recursos");
+    }
+
+    @Test
+    void card_should_be_ready_after_new_turn() {
+        // 1. ARRANGE
+        Card unit = new Card(UUID.randomUUID(), UUID.randomUUID(), "Soldier", Drive.of(2), Cost.of(1), CardType.UNIT);
+        unit.exhaust(); // La marcamos como cansada
+
+        PlayerState pA = new PlayerState(UUID.randomUUID(), new ArrayList<>(), true);
+        pA.getFieldLeft().add(unit);
+        GameState game = new GameState(UUID.randomUUID(), pA, new PlayerState(UUID.randomUUID(), new ArrayList<>(), false));
+
+        // 2. ACT
+        game.newTurn();
+
+        // 3. ASSERT
+        assertThat(unit.isExhausted()).isFalse();
+    }
+
+    @Test
+    void should_UpdateGameCorrectly_When_NewTurnStarts() {
+        // 1. ARRANGE
+        List<Card> deckA = new ArrayList<>();
+        deckA.add(new Card(UUID.randomUUID(), UUID.randomUUID(), "Test Card", Drive.of(1), Cost.of(1), CardType.UNIT));
+
+        PlayerState pA = new PlayerState(UUID.randomUUID(), deckA, true);
+        PlayerState pB = new PlayerState(UUID.randomUUID(), new ArrayList<>(), false);
+        GameState game = new GameState(UUID.randomUUID(), pA, pB);
+
+        // Simulamos que pA ya tiene una unidad en el campo izquierdo
+        Card unit = new Card(UUID.randomUUID(), pA.getPlayerId(), "Soldier", Drive.of(2), Cost.of(1), CardType.UNIT);
+        pA.getFieldLeft().add(unit);
+
+        // 2. ACT
+        game.newTurn();
+
+        // 3. ASSERT
+        // Comprobamos que el turno es 1 (empezó en 0)
+        assertThat(game.getTurnNumber().value()).isEqualTo(1);
+
+        // Comprobamos que pA ha ganado 1 punto por tener unidad en FieldLeft
+        assertThat(pA.getPoints().value()).isEqualTo(1);
+
+        // Comprobamos que ha robado la carta del deck
+        assertThat(pA.getHand()).hasSize(1);
+        assertThat(pA.getDeck()).isEmpty();
+
+        // Comprobamos que la energía se ha actualizado al turno 1
+        assertThat(pA.getResource().resource()).isEqualTo(1);
     }
 }

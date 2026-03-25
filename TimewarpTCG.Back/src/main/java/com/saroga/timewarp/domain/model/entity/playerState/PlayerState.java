@@ -35,6 +35,41 @@ public class PlayerState {
         this.fieldRight = new ArrayList<>();
     }
 
+    public boolean hasUnitsFieldLeft() {
+        if (fieldLeft.isEmpty()) {
+            return false;
+        }
+        return true;
+    }
+
+    public boolean hasUnitsFieldRight() {
+        if (fieldRight.isEmpty()) {
+            return false;
+        }
+        return true;
+    }
+
+    public void scorePoint() {
+        this.score = Score.of(this.score.value() + 1);
+    }
+
+    public void drawCard() {
+        if (deck.isEmpty()) {
+            return;
+        }
+
+        hand.add(deck.getFirst());
+        deck.removeFirst();
+    }
+
+    public void readyAllCards() {
+        base.forEach(Card::ready);
+        fieldRight.forEach(Card::ready);
+        fieldLeft.forEach(Card::ready);
+    }
+
+    // getter y setter //
+
     public Score getPoints() {
         return score;
     }
@@ -61,5 +96,37 @@ public class PlayerState {
 
     public UUID getPlayerId() {
         return playerId;
+    }
+
+    public boolean isPriority() {
+        return priority;
+    }
+
+    public Score getScore() {
+        return score;
+    }
+
+    public List<Card> getDeck() {
+        return deck;
+    }
+
+    public List<Card> getHand() {
+        return hand;
+    }
+
+    public List<Card> getGraveyard() {
+        return graveyard;
+    }
+
+    public List<Card> getBase() {
+        return base;
+    }
+
+    public List<Card> getFieldLeft() {
+        return fieldLeft;
+    }
+
+    public List<Card> getFieldRight() {
+        return fieldRight;
     }
 }

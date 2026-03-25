@@ -3,6 +3,8 @@ package com.saroga.timewarp.domain.model.entity.gameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
+import com.saroga.timewarp.domain.model.vo.playerState.Resource;
+import com.saroga.timewarp.domain.model.vo.playerState.Score;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,7 +15,6 @@ public class GameState {
     private final PlayerState playerA;
     private final PlayerState playerB;
     private Turn turnNumber;
-    private List<Card> allCardsInGame;
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -30,13 +31,35 @@ public class GameState {
             this.activePlayerId = playerA.hasPriority() ? playerA.getPlayerId() : playerB.getPlayerId();
     }
 
-    public List<Card> getAllCardsInGame() {
-        return allCardsInGame;
+    public void newTurn() {
+        setTurnNumber(Turn.of(this.turnNumber.value() + 1));
+
+        playerA.setResource(Resource.newTurnResource(this.turnNumber));
+        playerB.setResource(Resource.newTurnResource(this.turnNumber));
+
+        playerA.readyAllCards();
+        playerB.readyAllCards();
+
+        playerA.drawCard();
+        playerB.drawCard();
+
+        if (playerA.hasUnitsFieldLeft()) {
+            playerA.scorePoint();
+        }
+        if (playerA.hasUnitsFieldRight()) {
+            playerA.scorePoint();
+        }
+        if (playerB.hasUnitsFieldLeft()) {
+            playerB.scorePoint();
+        }
+        if (playerB.hasUnitsFieldRight()) {
+            playerB.scorePoint();
+        }
     }
 
-    public void setAllCardsInGame(List<Card> allCardsInGame) {
-        this.allCardsInGame = allCardsInGame;
-    }
+
+
+    // getter y setter //
 
     public Turn getTurnNumber() {
         return turnNumber;

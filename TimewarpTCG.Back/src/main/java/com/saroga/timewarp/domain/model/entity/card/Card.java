@@ -13,8 +13,9 @@ public class Card {
     private String name;
     private Drive drive;
     private Cost cost;
-    private CardLocation cardLocation;
     private final CardType cardType;
+    private CardLocation cardLocation;
+    private boolean exhausted;
     private boolean destroyed;
 
     public Card(UUID id, UUID ownerId, String name, Drive drive, Cost cost, CardType cardType) {
@@ -23,8 +24,9 @@ public class Card {
         this.name = name;
         this.drive = drive;
         this.cost = cost;
-        this.cardLocation = CardLocation.DECK; // la carta empieza en el mazo
         this.cardType = cardType;
+        this.cardLocation = CardLocation.DECK; // la carta empieza en el mazo
+        this.exhausted = true;
         this.destroyed = false;
     }
 
@@ -51,6 +53,10 @@ public class Card {
         this.onDestroyed();
     }
 
+    public void exhaust() { this.exhausted = true; }
+
+    public void ready() {this.exhausted = false; }
+
     public void onDestroyed() {
         System.out.println("Efectos que hace la carta al ser destruida");
     }
@@ -71,4 +77,12 @@ public class Card {
     public Drive getDrive() {
         return drive;
     }
+    public boolean isExhausted() { return exhausted; }
+    public UUID getId() {return id;}
+    public UUID getOwnerId() {return ownerId;}
+    public String getName() {return name;}
+    public Cost getCost() {return cost;}
+    public CardType getCardType() {return cardType;}
+    public CardLocation getCardLocation() {return cardLocation;}
+    public boolean isDestroyed() {return destroyed;}
 }
