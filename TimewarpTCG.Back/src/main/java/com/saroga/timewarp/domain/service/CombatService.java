@@ -28,6 +28,7 @@ public class CombatService {
         applyDamage(totalDrivePA, pB, lane);
         applyDamage(totalDrivePB, pA, lane);
 
+
     }
 
     private Drive calculateTotalDrive(PlayerState player, CardLocation location) {
@@ -60,6 +61,14 @@ public class CombatService {
             }
         }
 
+    }
+
+    private void checkGloryEffect(PlayerState player, CardLocation lane, boolean isWinner) {
+        if (isWinner) {
+            player.getUnitsIn(lane).stream()
+                    .filter(c -> c.hasKeyword(Keyword.GLORY))
+                    .forEach(Card::ready);
+        }
     }
 
     public boolean hasFieldUnitsFromBothPlayers(PlayerState pA, PlayerState pB, CardLocation lane) {
