@@ -1,6 +1,8 @@
 package com.saroga.timewarp.domain.model.entity.playerState;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
+import com.saroga.timewarp.domain.model.enums.CardLocation;
+import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
 
@@ -50,7 +52,7 @@ public class PlayerState {
     }
 
     public void scorePoint() {
-        this.score = Score.of(this.score.value() + 1);
+        this.score = this.score.scorePoint();
     }
 
     public void drawCard() {
@@ -66,6 +68,82 @@ public class PlayerState {
         base.forEach(Card::ready);
         fieldRight.forEach(Card::ready);
         fieldLeft.forEach(Card::ready);
+    }
+
+    public void destroyCard(Card card) {
+        card.destroy();
+        this.graveyard.add(card);
+
+        switch (card.getCardLocation()) {
+            case FIELD_LEFT -> fieldLeft.remove(card);
+            case FIELD_RIGHT -> fieldRight.remove(card);
+            case MY_BASE -> base.remove(card);
+        }
+    }
+
+    public boolean hasUnitsIn(CardLocation location) {
+        List<Card> cards = getUnitsIn(location);
+        return !cards.isEmpty();
+    }
+
+    public List<Card> getUnitsIn(CardLocation location) {
+        return switch (location) {
+            case FIELD_LEFT -> fieldLeft;
+            case FIELD_RIGHT -> fieldRight;
+            case MY_BASE -> base;
+            case GRAVEYARD -> graveyard;
+            case DECK -> deck;
+            case HAND -> hand;
+        };
+    }
+
+    public void moveCard(Card card, CardLocation destination) {
+        validateMovement(card, destination);
+        removeCardFromCurrentLocation(card);
+        addCardToLocation(card, destination);
+
+        card.setCardLocation(destination);
+        card.exhaust();
+    }
+
+    private void removeCardFromCurrentLocation(Card card) {
+        switch(card.getCardLocation()) {
+            case FIELD_LEFT -> fieldLeft.remove(card);
+            case FIELD_RIGHT -> fieldRight.remove(card);
+            case MY_BASE -> base.remove(card);
+        }
+    }
+
+    private void addCardToLocation(Card card, CardLocation destination) {
+        switch (destination) {
+            case FIELD_LEFT -> fieldLeft.add(card);
+            case FIELD_RIGHT -> fieldRight.add(card);
+            case MY_BASE -> base.add(card);
+        }
+    }
+
+    private void validateMovement(Card card, CardLocation destination) {
+        if (card.getCardLocation() == destination) {
+            throw new IllegalStateException("Mueve la carta a un battlefield diferente");
+        }
+        if (card.getCardLocation() == CardLocation.GRAVEYARD || card.getCardLocation() == CardLocation.DECK ||card.getCardLocation() == CardLocation.HAND) {
+            throw new IllegalStateException("No se pueden mover cartas que no están en juego");
+        }
+        if (destination == CardLocation.GRAVEYARD || destination == CardLocation.DECK || destination == CardLocation.HAND) {
+            throw new IllegalStateException("No se pueden mover cartas que no están en juego");
+        }
+        if (card.isExhausted()) {
+            throw new IllegalStateException("No puedes mover una carta exhausta");
+        }
+        if (isField(card.getCardLocation()) && isField(destination)) {
+            if (!card.hasKeyword(Keyword.JUMPER)) {
+                throw new IllegalStateException("No puedes mover unidades de un field a otro");
+            }
+        }
+    }
+
+    private boolean isField(CardLocation location) {
+        return location == CardLocation.FIELD_LEFT || location == CardLocation.FIELD_RIGHT;
     }
 
     // getter y setter //
