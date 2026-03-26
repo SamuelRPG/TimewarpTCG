@@ -1,5 +1,8 @@
 package com.saroga.timewarp.domain;
 
+import com.saroga.timewarp.domain.model.effect.charge.ChargeEffect;
+import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
+import com.saroga.timewarp.domain.model.effect.glory.GloryEffect;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
@@ -8,6 +11,7 @@ import com.saroga.timewarp.domain.model.enums.CardType;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
+import com.saroga.timewarp.domain.service.CombatService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -179,4 +183,55 @@ class GameStateTest {
         game.newTurn();
         assertThat(pA.getPoints().value()).isEqualTo(1);
     }
+
+        @Test
+        void testCombatWithPermanentChargeAndGlory() {
+            // 1. CONFIGURACIÓN
+            UUID idA = UUID.randomUUID();
+            UUID idB = UUID.randomUUID();
+            CombatService combatService = new CombatService();
+
+            // Creamos los efectos reales
+            Effect chargePermanente = new ChargeEffect(); // Implementa beforeCombat { owner.buffDrive(1) }
+            Effect glory = new GloryEffect();             // Implementa onCombatWin { owner.ready() }
+
+            // Jugador A: Caballero con 5 de Drive base
+            Card caballeroA = new Card(UUID.randomUUID(), idA, "Caballero",
+                    Drive.of(5), Drive.of(5), Cost.of(3),
+                    CardType.UNIT, new ArrayList<>(), List.of(chargePermanente, glory));
+            caballeroA.exhaust(); // Empieza agotado
+
+            // Jugador B: Orco con 3 de Drive base
+            Card orcoB = new Card(UUID.randomUUID(), idB, "Orco",
+                    Drive.of(3), Drive.of(3), Cost.of(2),
+                    CardType.UNIT, new ArrayList<>(), new ArrayList<>());
+
+            // Inicializamos estados (usando tu constructor: UUID, deck, hasPriority)
+            PlayerState pA = new PlayerState(idA, new ArrayList<>(), true);
+            PlayerState pB = new PlayerState(idB, new ArrayList<>(), false);
+            GameState gameState = new GameState(UUID.randomUUID(), pA, pB);
+
+            // Posicionamos en el campo
+            pA.addCardToLocation(caballeroA, CardLocation.FIELD_LEFT);
+            pB.addCardToLocation(orcoB, CardLocation.FIELD_LEFT);
+
+            // 2. EJECUCIÓN DEL COMBATE
+            // Paso interno 1: beforeCombat -> Caballero sube de 5 a 6 permanentemente.
+            // Paso interno 2: Cálculo -> 6 vs 3.
+            // Paso interno 3: Daño -> Caballero recibe 3 de daño.
+            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_LEFT);
+
+            // 3. VERIFICACIONES
+
+            // El Orco recibe 6 de daño (muere)
+            assertTrue(orcoB.isDestroyed(), "El Orco debería haber muerto");
+
+            // El Caballero:
+            // Su Drive era 5 -> Charge lo subió a 6 -> Recibió 3 de daño -> Queda en 3.
+            assertFalse(caballeroA.isDestroyed(), "El Caballero debería sobrevivir");
+            assertEquals(3, caballeroA.getDrive().value(), "El Caballero debería tener 3 de vida (6 iniciales tras Charge - 3 de daño)");
+
+            // GLORY: Al ganar y sobrevivir, se activa y se pone Ready
+            assertFalse(caballeroA.isExhausted(), "El Caballero debería estar READY por el efecto GLORY");
+        }
 }

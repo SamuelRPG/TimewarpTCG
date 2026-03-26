@@ -22,22 +22,34 @@ public class CombatService {
             throw new IllegalStateException("No hay unidades de ambos jugadores para provocar un combate");
         }
 
+        // 1. AVISO: Las unidades ejecutan sus efectos "Antes del combate"
+        // Aquí es donde el Charge suma el +1 permanente a la vida/ataque real
+        pA.getUnitsIn(lane).forEach(c -> c.beforeCombat());
+        pB.getUnitsIn(lane).forEach(c -> c.beforeCombat());
+
         Drive totalDrivePA = calculateTotalDrive(pA, lane);
         Drive totalDrivePB = calculateTotalDrive(pB, lane);
 
         applyDamage(totalDrivePA, pB, lane);
         applyDamage(totalDrivePB, pA, lane);
 
+        if (totalDrivePA.value() == totalDrivePB.value()) {
+            System.out.println("Empate");
+        } else {
+            PlayerState winner = determineWinner(pA, pB, totalDrivePA, totalDrivePB);
+            notifyVictory(winner, lane);
+        }
 
+
+    }
+
+    private PlayerState determineWinner(PlayerState pA, PlayerState pB, Drive powerA, Drive powerB) {
+        return powerA.value() > powerB.value() ? pA : pB;
     }
 
     private Drive calculateTotalDrive(PlayerState player, CardLocation location) {
     int totalDrive = player.getUnitsIn(location).stream()
-                    .mapToInt( card -> {
-                        int power = card.getDrive().value();
-                        if (card.hasKeyword(Keyword.CHARGE)) power += 1;
-                        return power;
-                    })
+                    .mapToInt( card -> card.getEffectiveDrive().value())
                     .sum();
 
     return Drive.of(totalDrive);
@@ -63,15 +75,11 @@ public class CombatService {
 
     }
 
-    private void checkGloryEffect(PlayerState player, CardLocation lane, boolean isWinner) {
-        if (isWinner) {
-            player.getUnitsIn(lane).stream()
-                    .filter(c -> c.hasKeyword(Keyword.GLORY))
-                    .forEach(Card::ready);
-        }
-    }
-
     public boolean hasFieldUnitsFromBothPlayers(PlayerState pA, PlayerState pB, CardLocation lane) {
         return pA.hasUnitsIn(lane) && pB.hasUnitsIn(lane);
+    }
+
+    private void notifyVictory(PlayerState winner, CardLocation lane) {
+        winner.getUnitsIn(lane).forEach(c -> c.onCombatWin(winner, lane));
     }
 }

@@ -1,5 +1,7 @@
 package com.saroga.timewarp.domain.model.entity.card;
 
+import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
+import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.CardType;
 import com.saroga.timewarp.domain.model.enums.Keyword;
@@ -21,11 +23,14 @@ public class Card {
     private CardLocation cardLocation;
     private boolean exhausted;
     private boolean destroyed;
-    private List<Keyword> keywords;
 
-    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType, List<Keyword> keywords) {
+    private List<Keyword> keywords;
+    private List<Effect> effects;
+
+    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType, List<Keyword> keywords, List<Effect> effects) {
         this(id, ownerId, name, initialDrive, drive, cost, cardType); // Llama al de abajo
-        this.keywords = new ArrayList<>(keywords);
+        this.keywords = keywords != null ? new ArrayList<>(keywords) : new ArrayList<>();
+        this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
     }
 
     public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType) {
@@ -40,16 +45,33 @@ public class Card {
         this.exhausted = true;
         this.destroyed = false;
         this.keywords = new ArrayList<>();
+        this.effects = new ArrayList<>();
     }
 
-    public void takeDamage(Drive damage) {
+    public void takeDamage(Drive amount) {
         if (this.destroyed) return;
 
-        this.drive = drive.decrease(damage);
+        this.drive = drive.decrease(amount);
+
+        // Notificar a los efectos que hemos recibido daño (por si alguno salta)
+        effects.forEach(e -> e.onDamageTaken(this, amount));
 
         if (this.drive.isZero()) {
-            this.destroyed = true;
+            this.destroy();
         }
+    }
+
+    public void onPlaced(PlayerState player, CardLocation location) {
+        effects.forEach(e -> e.onPlaced(this, player, location));
+    }
+
+    public void onCombatWin(PlayerState player, CardLocation lane) {
+        effects.forEach(e -> e.onCombatWin(this, player, lane));
+    }
+
+    public Drive getEffectiveDrive() {
+        int bonus = effects.stream().mapToInt(e -> e.plusOneDrive(this)).sum();
+        return Drive.of(this.drive.value() + bonus);
     }
 
     public void buffDrive(Drive amount) {
@@ -64,6 +86,10 @@ public class Card {
         this.drive = Drive.of(0);
         this.destroyed = true;
         this.onDestroyed();
+    }
+
+    public void beforeCombat() {
+        effects.forEach(e -> e.beforeCombat(this));
     }
 
     public void exhaust() { this.exhausted = true; }

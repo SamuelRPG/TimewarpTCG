@@ -114,7 +114,7 @@ public class PlayerState {
         }
     }
 
-    private void addCardToLocation(Card card, CardLocation destination) {
+    public void addCardToLocation(Card card, CardLocation destination) {
         switch (destination) {
             case FIELD_LEFT -> fieldLeft.add(card);
             case FIELD_RIGHT -> fieldRight.add(card);
