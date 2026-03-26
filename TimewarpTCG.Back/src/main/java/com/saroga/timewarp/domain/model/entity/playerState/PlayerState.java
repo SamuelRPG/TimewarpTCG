@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain.model.entity.playerState;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
+import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
@@ -42,6 +43,15 @@ public class PlayerState {
             return false;
         }
         return true;
+    }
+
+    public List<Card> getAllCardsOnBoard() {
+        List<Card> cardsInPlay = new ArrayList<>();
+        cardsInPlay.addAll(base);
+        cardsInPlay.addAll(fieldLeft);
+        cardsInPlay.addAll(fieldRight);
+
+        return cardsInPlay;
     }
 
     public boolean hasUnitsFieldRight() {
@@ -103,7 +113,19 @@ public class PlayerState {
         addCardToLocation(card, destination);
 
         card.setCardLocation(destination);
-        card.exhaust();
+    }
+
+    public void confirmMoveAndPassPriority(GameState gameState) {
+        if (!this.priority) {
+            throw new IllegalStateException("No puedes confirmar si no tienes la prioridad.");
+        }
+
+        // 1. Recorremos las unidades que están en los campos de batalla
+        // y les avisamos de que su posición ahora es OFICIAL.
+        fieldLeft.forEach(card -> card.onMovementConfirmed(this, CardLocation.FIELD_LEFT));
+        fieldRight.forEach(card -> card.onMovementConfirmed(this, CardLocation.FIELD_RIGHT));
+
+        gameState.switchPriority();
     }
 
     private void removeCardFromCurrentLocation(Card card) {

@@ -48,6 +48,9 @@ public class GameState {
         playerA.drawCard();
         playerB.drawCard();
 
+        playerA.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
+        playerB.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
+        
         updateScores();
     }
 

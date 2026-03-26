@@ -23,6 +23,7 @@ public class Card {
     private CardLocation cardLocation;
     private boolean exhausted;
     private boolean destroyed;
+    private CardLocation cardLocationAtBeginningOfRound;
 
     private List<Keyword> keywords;
     private List<Effect> effects;
@@ -46,6 +47,7 @@ public class Card {
         this.destroyed = false;
         this.keywords = new ArrayList<>();
         this.effects = new ArrayList<>();
+        this.cardLocationAtBeginningOfRound = CardLocation.DECK;
     }
 
     public void takeDamage(Drive amount) {
@@ -70,7 +72,7 @@ public class Card {
     }
 
     public Drive getEffectiveDrive() {
-        int bonus = effects.stream().mapToInt(e -> e.plusOneDrive(this)).sum();
+        int bonus = effects.stream().mapToInt(e -> e.modifyDrive(this)).sum();
         return Drive.of(this.drive.value() + bonus);
     }
 
@@ -86,6 +88,10 @@ public class Card {
         this.drive = Drive.of(0);
         this.destroyed = true;
         this.onDestroyed();
+    }
+
+    public void onMovementConfirmed(PlayerState player, CardLocation lane) {
+        effects.forEach(e -> e.onMovementConfirmed(this, player, lane));
     }
 
     public void beforeCombat() {
@@ -129,4 +135,12 @@ public class Card {
     public boolean isDestroyed() {return destroyed;}
     public List<Keyword> getKeywords() {return keywords;}
     public Drive getInitialDrive() {return initialDrive;}
+
+    public CardLocation getCardLocationAtBeginningOfRound() {
+        return cardLocationAtBeginningOfRound;
+    }
+
+    public void setCardLocationAtBeginningOfRound(CardLocation cardLocationAtBeginningOfRound) {
+        this.cardLocationAtBeginningOfRound = cardLocationAtBeginningOfRound;
+    }
 }
