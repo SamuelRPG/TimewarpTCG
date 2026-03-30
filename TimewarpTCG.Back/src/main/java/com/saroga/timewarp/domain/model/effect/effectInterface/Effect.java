@@ -10,7 +10,7 @@ import java.util.List;
 public interface Effect {
     default void onCombatWin(Card card, PlayerState owner, CardLocation lane) { }
     default void onDamageTaken(Card card, Drive drive) {}
-    default void onPlaced(Card card, PlayerState owner, CardLocation lane, List<Card> targets) {}
+    default void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {}
     default void onOtherUnitPlaced(Card card, PlayerState owner, CardLocation lane) {}
     default void onCombat(Card card, PlayerState owner, CardLocation lane) {}
     default int modifyDrive(Card card) {return 0;}

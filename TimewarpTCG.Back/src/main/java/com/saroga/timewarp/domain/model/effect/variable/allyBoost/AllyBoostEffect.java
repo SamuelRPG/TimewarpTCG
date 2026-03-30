@@ -16,9 +16,11 @@ public class AllyBoostEffect implements Effect {
         this.amountBoost = amountBoost;
     }
     @Override
-    public void onPlaced(Card card, PlayerState owner, CardLocation location, List<Card> targets) {
+    public void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation location, List<Card> targets) {
         for (Card target : targets) {
-            target.buffDrive(amountBoost);
+            if (target.getOwnerId().equals(owner.getPlayerId())) {
+                target.buffDrive(amountBoost);
+            }
         }
     }
 }

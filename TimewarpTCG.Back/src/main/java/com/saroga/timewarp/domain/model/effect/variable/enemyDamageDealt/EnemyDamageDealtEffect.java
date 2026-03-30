@@ -16,9 +16,11 @@ public class EnemyDamageDealtEffect implements Effect {
     }
 
     @Override
-    public void onPlaced(Card card, PlayerState owner, CardLocation location, List<Card> targets) {
+    public void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation location, List<Card> targets) {
         for (Card target : targets) {
-            target.takeDamage(amount);
+            if (target.getOwnerId().equals(opponent.getPlayerId())) {
+                target.takeDamage(amount);
+            }
         }
     }
 }

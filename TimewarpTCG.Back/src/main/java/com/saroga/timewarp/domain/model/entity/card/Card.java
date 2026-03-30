@@ -7,6 +7,7 @@ import com.saroga.timewarp.domain.model.enums.CardType;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
+import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,14 +25,16 @@ public class Card {
     private boolean exhausted;
     private boolean destroyed;
     private CardLocation cardLocationAtBeginningOfRound;
+    private List<TargetingRequirement> targetingRequirements;
 
     private List<Keyword> keywords;
     private List<Effect> effects;
 
-    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType, List<Keyword> keywords, List<Effect> effects) {
+    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements) {
         this(id, ownerId, name, initialDrive, drive, cost, cardType); // Llama al de abajo
         this.keywords = keywords != null ? new ArrayList<>(keywords) : new ArrayList<>();
         this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
+        this.targetingRequirements = targetingRequirements != null ? new ArrayList<>(targetingRequirements) : new ArrayList<>();
     }
 
     public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType) {
@@ -50,15 +53,19 @@ public class Card {
         this.cardLocationAtBeginningOfRound = CardLocation.DECK;
     }
 
-    public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost, List<Keyword> keywords, List<Effect> effects) {
-        return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost, CardType.UNIT, keywords, effects);
+    public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost,
+                                  List<Keyword> keywords, List<Effect> effects,
+                                  List<TargetingRequirement> targetingRequirements) {
+        return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost,
+                CardType.UNIT, keywords, effects, targetingRequirements);
     }
 
-    public static Card createSpell(UUID ownerId, String name, Cost cost, List<Effect> effects) {
-        return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost, CardType.SPELL, new ArrayList<>(), effects);
+    public static Card createSpell(UUID ownerId, String name, Cost cost,
+                                   List<Effect> effects,
+                                   List<TargetingRequirement> targetingRequirements) {
+        return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost,
+                CardType.SPELL, new ArrayList<>(), effects, targetingRequirements);
     }
-
-    // --- LÓGICA DE SEGURIDAD ---
 
     public boolean isUnit() {
         return this.cardType == CardType.UNIT;
@@ -81,8 +88,8 @@ public class Card {
         }
     }
 
-    public void onPlaced(PlayerState player, CardLocation location, List<Card> targets) {
-        effects.forEach(e -> e.onPlaced(this, player, location, targets));
+    public void onPlaced(PlayerState player, PlayerState opponent, CardLocation location, List<Card> targets) {
+        effects.forEach(e -> e.onPlaced(this, player, opponent, location, targets));
     }
 
     public void onCombatWin(PlayerState player, CardLocation lane) {
@@ -155,4 +162,6 @@ public class Card {
     public Drive getInitialDrive() {return initialDrive;}
     public CardLocation getCardLocationAtBeginningOfRound() { return cardLocationAtBeginningOfRound;}
     public void setCardLocationAtBeginningOfRound(CardLocation cardLocationAtBeginningOfRound) { this.cardLocationAtBeginningOfRound = cardLocationAtBeginningOfRound;}
+    public List<TargetingRequirement> getTargetingRequirements() {return targetingRequirements;}
+    public void setTargetingRequirements(List<TargetingRequirement> targetingRequirements) {this.targetingRequirements = targetingRequirements;}
 }
