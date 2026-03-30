@@ -6,11 +6,12 @@ import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 
+import java.util.List;
 import java.util.UUID;
 
 public class CardPlayService {
 
-    public void executePlay(GameState gameState, UUID playerId, Card card, CardLocation destination) {
+    public void executePlay(GameState gameState, UUID playerId, Card card, CardLocation destination, List<Card> targets) {
         PlayerState actor = gameState.getPlayerById(playerId);
         boolean contested = gameState.isBattlefieldContested(destination);
 

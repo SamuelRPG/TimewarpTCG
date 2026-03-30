@@ -5,10 +5,12 @@ import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 
+import java.util.List;
+
 public interface Effect {
     default void onCombatWin(Card card, PlayerState owner, CardLocation lane) { }
     default void onDamageTaken(Card card, Drive drive) {}
-    default void onPlaced(Card card, PlayerState owner, CardLocation lane) {}
+    default void onPlaced(Card card, PlayerState owner, CardLocation lane, List<Card> targets) {}
     default void onOtherUnitPlaced(Card card, PlayerState owner, CardLocation lane) {}
     default void onCombat(Card card, PlayerState owner, CardLocation lane) {}
     default int modifyDrive(Card card) {return 0;}

@@ -50,6 +50,24 @@ public class Card {
         this.cardLocationAtBeginningOfRound = CardLocation.DECK;
     }
 
+    public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost, List<Keyword> keywords, List<Effect> effects) {
+        return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost, CardType.UNIT, keywords, effects);
+    }
+
+    public static Card createSpell(UUID ownerId, String name, Cost cost, List<Effect> effects) {
+        return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost, CardType.SPELL, new ArrayList<>(), effects);
+    }
+
+    // --- LÓGICA DE SEGURIDAD ---
+
+    public boolean isUnit() {
+        return this.cardType == CardType.UNIT;
+    }
+
+    public boolean isSpell() {
+        return this.cardType == CardType.SPELL;
+    }
+
     public void takeDamage(Drive amount) {
         if (this.destroyed) return;
 
@@ -63,8 +81,8 @@ public class Card {
         }
     }
 
-    public void onPlaced(PlayerState player, CardLocation location) {
-        effects.forEach(e -> e.onPlaced(this, player, location));
+    public void onPlaced(PlayerState player, CardLocation location, List<Card> targets) {
+        effects.forEach(e -> e.onPlaced(this, player, location, targets));
     }
 
     public void onCombatWin(PlayerState player, CardLocation lane) {

@@ -1,4 +1,4 @@
-package com.saroga.timewarp.domain.model.effect.glory;
+package com.saroga.timewarp.domain.model.effect.keyword.glory;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.card.Card;

@@ -1,8 +1,8 @@
 package com.saroga.timewarp.domain;
 
-import com.saroga.timewarp.domain.model.effect.charge.ChargeEffect;
+import com.saroga.timewarp.domain.model.effect.keyword.charge.ChargeEffect;
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
-import com.saroga.timewarp.domain.model.effect.glory.GloryEffect;
+import com.saroga.timewarp.domain.model.effect.keyword.glory.GloryEffect;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;

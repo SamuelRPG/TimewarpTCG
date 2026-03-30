@@ -1,4 +1,4 @@
-package com.saroga.timewarp.domain.model.effect.charge;
+package com.saroga.timewarp.domain.model.effect.keyword.charge;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.card.Card;
