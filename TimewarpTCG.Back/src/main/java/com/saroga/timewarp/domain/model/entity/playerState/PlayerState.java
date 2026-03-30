@@ -7,15 +7,14 @@ import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class PlayerState {
     private final UUID playerId;
     private boolean priority;
     private Resource resource;
     private Score score;
+    private Set<Card> pendingMoves = new HashSet<>();
 
     private List<Card> deck;
     private List<Card> hand;
@@ -38,13 +37,6 @@ public class PlayerState {
         this.fieldRight = new ArrayList<>();
     }
 
-    public boolean hasUnitsFieldLeft() {
-        if (fieldLeft.isEmpty()) {
-            return false;
-        }
-        return true;
-    }
-
     public List<Card> getAllCardsOnBoard() {
         List<Card> cardsInPlay = new ArrayList<>();
         cardsInPlay.addAll(base);
@@ -52,13 +44,6 @@ public class PlayerState {
         cardsInPlay.addAll(fieldRight);
 
         return cardsInPlay;
-    }
-
-    public boolean hasUnitsFieldRight() {
-        if (fieldRight.isEmpty()) {
-            return false;
-        }
-        return true;
     }
 
     public void scorePoint() {
@@ -107,12 +92,22 @@ public class PlayerState {
         };
     }
 
+    public void executePlayCard(Card card, CardLocation location) {
+        this.resource.spend(card.getCost());
+
+        this.getHand().remove(card);
+        addCardToLocation(card, location);
+
+        pendingMoves.add(card);
+    }
+
     public void moveCard(Card card, CardLocation destination) {
         validateMovement(card, destination);
         removeCardFromCurrentLocation(card);
         addCardToLocation(card, destination);
 
         card.setCardLocation(destination);
+        pendingMoves.add(card);
     }
 
     public void confirmMoveAndPassPriority(GameState gameState) {
@@ -120,11 +115,18 @@ public class PlayerState {
             throw new IllegalStateException("No puedes confirmar si no tienes la prioridad.");
         }
 
-        // 1. Recorremos las unidades que están en los campos de batalla
-        // y les avisamos de que su posición ahora es OFICIAL.
-        fieldLeft.forEach(card -> card.onMovementConfirmed(this, CardLocation.FIELD_LEFT));
-        fieldRight.forEach(card -> card.onMovementConfirmed(this, CardLocation.FIELD_RIGHT));
+        PlayerState opponent = gameState.getOpponentOf(this.getPlayerId());
 
+        for (Card card : pendingMoves) {
+            if (card.getCardLocation() != card.getCardLocationAtBeginningOfRound()) {
+                if (isField(card.getCardLocation())) {
+                    card.onMovementConfirmed(this, opponent, card.getCardLocation());
+                }
+                card.setCardLocationAtBeginningOfRound(card.getCardLocation());
+                card.exhaust();
+            }
+        }
+        pendingMoves.clear();
         gameState.switchPriority();
     }
 

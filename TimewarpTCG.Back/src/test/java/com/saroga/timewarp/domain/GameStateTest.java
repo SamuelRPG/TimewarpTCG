@@ -59,7 +59,7 @@ class GameStateTest {
         player.setResource(player.getResource().spend(cardCost));
 
         // Verificación
-        assertEquals(2, player.getResource().resource(), "Deberían quedar 2 de energía");
+        assertEquals(2, player.getResource().value(), "Deberían quedar 2 de energía");
     }
 
     @Test
@@ -138,100 +138,100 @@ class GameStateTest {
         assertThat(pA.getDeck()).isEmpty();
 
         // Comprobamos que la energía se ha actualizado al turno 1
-        assertThat(pA.getResource().resource()).isEqualTo(1);
+        assertThat(pA.getResource().value()).isEqualTo(1);
     }
 
     @Test
     void should_ExecuteFullRoundFlowCorrectly() {
         // 1. ARRANGE
-        Card unit = new Card(UUID.randomUUID(), UUID.randomUUID(), "Soldier", Drive.of(5), Drive.of(5), Cost.of(1), CardType.UNIT);
-        // Asumimos que al crearla o entrar en mano/base nace con exhausted = true
-        unit.exhaust();
+        Card unit = new Card(UUID.randomUUID(), UUID.randomUUID(), "Soldier",
+                Drive.of(5), Drive.of(5), Cost.of(1), CardType.UNIT);
 
-        List<Card> deckA = new ArrayList<>(List.of(unit));
-        PlayerState pA = new PlayerState(UUID.randomUUID(), deckA, true);
+        PlayerState pA = new PlayerState(UUID.randomUUID(), new ArrayList<>(List.of(unit)), true);
         PlayerState pB = new PlayerState(UUID.randomUUID(), new ArrayList<>(), false);
         GameState game = new GameState(UUID.randomUUID(), pA, pB);
 
-        // 2. ACT: Comienza el turno (Esto debería hacer 'ready()' a las cartas si ya estuvieran, pero aquí roba)
-        game.newTurn();
+        // Empieza el juego: Las cartas en mano están en DECK/HAND
+        game.newTurn(); // Roba la carta y setea initialLocation = HAND
 
-        // 3. Jugar carta a la Base (Nace agotada según tu regla)
+        // 2. Simulamos jugar la carta a la Base
         pA.getHand().remove(unit);
         pA.getBase().add(unit);
         unit.setCardLocation(CardLocation.MY_BASE);
-        unit.exhaust(); // Nos aseguramos de que está agotada al entrar
+        unit.exhaust(); // Nace agotada al entrar en juego
 
-        // 4. VERIFICACIÓN: Intentar moverla de Base a Field inmediatamente debería FALLAR
-        assertThrows(IllegalStateException.class, () -> {
-            pA.moveCard(unit, CardLocation.FIELD_LEFT);
-        }, "No debería poder moverse el mismo turno que entra si nace agotada");
-
-        // 5. PASO DE TURNO: Para que se recupere
+        // 3. Pasamos turno para que se recupere (Ready)
         game.newTurn();
-        assertThat(unit.isExhausted()).isFalse(); // El newTurn la ha despertado
+        assertFalse(unit.isExhausted(), "Tras un nuevo turno, la unidad debe estar Ready");
+        // En este punto, cardLocationAtBeginningOfRound = MY_BASE
 
-        // 6. MOVIMIENTO: Ahora sí, de Base a Field Left
+        // 4. MOVIMIENTO: De Base a Field Left
         pA.moveCard(unit, CardLocation.FIELD_LEFT);
 
-        // 7. ASSERT: Verificar estado tras movimiento
+        // VERIFICACIÓN INTERMEDIA: ¡No debería estar agotada todavía!
+        // El jugador aún puede arrepentirse en Unity.
+        assertFalse(unit.isExhausted(), "No debe agotarse hasta que se confirme");
+
+        // 5. ACT: Confirmamos el movimiento y pasamos prioridad
+        pA.confirmMoveAndPassPriority(game);
+
+        // 6. ASSERT: Ahora sí debe estar agotada y en su sitio
+        assertTrue(unit.isExhausted(), "Tras confirmar, la unidad debe estar agotada");
         assertThat(pA.getBase()).isEmpty();
         assertThat(pA.getFieldLeft()).contains(unit);
-        assertThat(unit.isExhausted()).isTrue(); // Se agota de nuevo por moverse
 
-        // 8. FINAL: Comprobamos puntos en el siguiente ciclo
+        // 7. FINAL: Comprobamos puntos al final del ciclo
         game.newTurn();
-        assertThat(pA.getPoints().value()).isEqualTo(1);
+        assertEquals(1, pA.getScore().value(), "Debería tener 1 punto por controlar el Field");
     }
 
-        @Test
-        void testCombatWithPermanentChargeAndGlory() {
-            // 1. CONFIGURACIÓN
-            UUID idA = UUID.randomUUID();
-            UUID idB = UUID.randomUUID();
-            CombatService combatService = new CombatService();
+    @Test
+    void testCombatWithPermanentChargeAndGlory() {
+        // 1. CONFIGURACIÓN
+        UUID idA = UUID.randomUUID();
+        UUID idB = UUID.randomUUID();
+        CombatService combatService = new CombatService();
 
-            // Creamos los efectos reales
-            Effect chargePermanente = new ChargeEffect(); // Implementa beforeCombat { owner.buffDrive(1) }
-            Effect glory = new GloryEffect();             // Implementa onCombatWin { owner.ready() }
+        // Efectos: Charge da +1 permanente al iniciar combate, Glory endereza al ganar
+        Effect chargePermanente = new ChargeEffect();
+        Effect glory = new GloryEffect();
 
-            // Jugador A: Caballero con 5 de Drive base
-            Card caballeroA = new Card(UUID.randomUUID(), idA, "Caballero",
-                    Drive.of(5), Drive.of(5), Cost.of(3),
-                    CardType.UNIT, new ArrayList<>(), List.of(chargePermanente, glory));
-            caballeroA.exhaust(); // Empieza agotado
+        Card caballeroA = new Card(UUID.randomUUID(), idA, "Caballero",
+                Drive.of(5), Drive.of(5), Cost.of(3),
+                CardType.UNIT, new ArrayList<>(), List.of(chargePermanente, glory));
 
-            // Jugador B: Orco con 3 de Drive base
-            Card orcoB = new Card(UUID.randomUUID(), idB, "Orco",
-                    Drive.of(3), Drive.of(3), Cost.of(2),
-                    CardType.UNIT, new ArrayList<>(), new ArrayList<>());
+        Card orcoB = new Card(UUID.randomUUID(), idB, "Orco",
+                Drive.of(3), Drive.of(3), Cost.of(2),
+                CardType.UNIT, new ArrayList<>(), new ArrayList<>());
 
-            // Inicializamos estados (usando tu constructor: UUID, deck, hasPriority)
-            PlayerState pA = new PlayerState(idA, new ArrayList<>(), true);
-            PlayerState pB = new PlayerState(idB, new ArrayList<>(), false);
-            GameState gameState = new GameState(UUID.randomUUID(), pA, pB);
+        PlayerState pA = new PlayerState(idA, new ArrayList<>(), true);
+        PlayerState pB = new PlayerState(idB, new ArrayList<>(), false);
+        GameState gameState = new GameState(UUID.randomUUID(), pA, pB);
 
-            // Posicionamos en el campo
-            pA.addCardToLocation(caballeroA, CardLocation.FIELD_LEFT);
-            pB.addCardToLocation(orcoB, CardLocation.FIELD_LEFT);
+        // Posicionamos manualmente (sin pasar por moveCard para este test)
+        pA.addCardToLocation(caballeroA, CardLocation.FIELD_LEFT);
+        caballeroA.setCardLocation(CardLocation.FIELD_LEFT);
+        caballeroA.exhaust(); // Empieza cansado para probar el Glory
 
-            // 2. EJECUCIÓN DEL COMBATE
-            // Paso interno 1: beforeCombat -> Caballero sube de 5 a 6 permanentemente.
-            // Paso interno 2: Cálculo -> 6 vs 3.
-            // Paso interno 3: Daño -> Caballero recibe 3 de daño.
-            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_LEFT);
+        pB.addCardToLocation(orcoB, CardLocation.FIELD_LEFT);
+        orcoB.setCardLocation(CardLocation.FIELD_LEFT);
 
-            // 3. VERIFICACIONES
+        // 2. EJECUCIÓN
+        // IMPORTANTE: Disparamos el "Antes de combatir" para que el Charge sume +1
+        caballeroA.onMovementConfirmed(pA, pB, caballeroA.getCardLocation());
 
-            // El Orco recibe 6 de daño (muere)
-            assertTrue(orcoB.isDestroyed(), "El Orco debería haber muerto");
+        // Ahora el combate: 6 vs 3.
+        // Caballero recibe 3 de daño ($6 - 3 = 3$). Orco recibe 6 ($3 - 6 = -3 \rightarrow$ Muere)
+        combatService.resolveLaneCombat(gameState, CardLocation.FIELD_LEFT);
 
-            // El Caballero:
-            // Su Drive era 5 -> Charge lo subió a 6 -> Recibió 3 de daño -> Queda en 3.
-            assertFalse(caballeroA.isDestroyed(), "El Caballero debería sobrevivir");
-            assertEquals(3, caballeroA.getDrive().value(), "El Caballero debería tener 3 de vida (6 iniciales tras Charge - 3 de daño)");
+        // 3. VERIFICACIONES
+        assertTrue(orcoB.isDestroyed(), "El Orco debería haber muerto");
+        assertFalse(caballeroA.isDestroyed(), "El Caballero debería sobrevivir");
 
-            // GLORY: Al ganar y sobrevivir, se activa y se pone Ready
-            assertFalse(caballeroA.isExhausted(), "El Caballero debería estar READY por el efecto GLORY");
-        }
+        // Verificamos vida: 5 (base) + 1 (charge) - 3 (daño orco) = 3
+        assertEquals(3, caballeroA.getDrive().value(), "Vida: 5+1-3=3");
+
+        // GLORY: Al ganar, el efecto Glory debió hacer caballero.ready()
+        assertFalse(caballeroA.isExhausted(), "El Caballero debería estar READY por el Glory");
+    }
 }

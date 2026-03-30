@@ -10,9 +10,11 @@ public class ChargeEffect implements Effect {
     private final int bonus = 1;
 
     @Override
-    public void onMovementConfirmed(Card card, PlayerState owner, CardLocation lane) {
+    public void onMovementConfirmed(Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {
         if (lane == CardLocation.FIELD_LEFT || lane == CardLocation.FIELD_RIGHT) {
-            card.buffDrive(Drive.of(bonus));
+            if (opponent.hasUnitsIn(lane) && owner.hasUnitsIn(lane)) {
+                card.buffDrive(Drive.of(bonus));
+            }
         }
     }
 }

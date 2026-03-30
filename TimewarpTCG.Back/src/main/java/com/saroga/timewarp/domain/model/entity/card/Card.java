@@ -90,8 +90,8 @@ public class Card {
         this.onDestroyed();
     }
 
-    public void onMovementConfirmed(PlayerState player, CardLocation lane) {
-        effects.forEach(e -> e.onMovementConfirmed(this, player, lane));
+    public void onMovementConfirmed(PlayerState player, PlayerState opponent, CardLocation lane) {
+        effects.forEach(e -> e.onMovementConfirmed(this, player, opponent, lane));
     }
 
     public void beforeCombat() {
@@ -135,12 +135,6 @@ public class Card {
     public boolean isDestroyed() {return destroyed;}
     public List<Keyword> getKeywords() {return keywords;}
     public Drive getInitialDrive() {return initialDrive;}
-
-    public CardLocation getCardLocationAtBeginningOfRound() {
-        return cardLocationAtBeginningOfRound;
-    }
-
-    public void setCardLocationAtBeginningOfRound(CardLocation cardLocationAtBeginningOfRound) {
-        this.cardLocationAtBeginningOfRound = cardLocationAtBeginningOfRound;
-    }
+    public CardLocation getCardLocationAtBeginningOfRound() { return cardLocationAtBeginningOfRound;}
+    public void setCardLocationAtBeginningOfRound(CardLocation cardLocationAtBeginningOfRound) { this.cardLocationAtBeginningOfRound = cardLocationAtBeginningOfRound;}
 }

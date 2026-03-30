@@ -3,9 +3,9 @@ package com.saroga.timewarp.domain.model.vo.playerState;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
 
-public record Resource(int resource) {
+public record Resource(int value) {
     public Resource {
-        if (resource < 0) resource = 0;
+        if (value < 0) value = 0;
     }
 
     public static Resource of(int resource) {
@@ -13,14 +13,14 @@ public record Resource(int resource) {
     }
 
     public Resource spend(Cost cost) {
-        if (this.resource < cost.value()) {
+        if (this.value < cost.value()) {
             throw new IllegalStateException("No puedes jugar cartas que superen tu recurso actual");
         }
-        return new Resource(this.resource - cost.value());
+        return new Resource(this.value - cost.value());
     }
 
     public Resource add(int amount) {
-        return new Resource(this.resource + amount);
+        return new Resource(this.value + amount);
     }
 
     public static Resource newTurnResource(Turn turn) {

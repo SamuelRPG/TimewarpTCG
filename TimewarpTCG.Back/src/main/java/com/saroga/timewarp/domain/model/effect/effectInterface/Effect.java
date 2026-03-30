@@ -13,5 +13,5 @@ public interface Effect {
     default void onCombat(Card card, PlayerState owner, CardLocation lane) {}
     default int modifyDrive(Card card) {return 0;}
     default void beforeCombat(Card card) {}
-    default void onMovementConfirmed(Card card, PlayerState owner, CardLocation lane) {}
+    default void onMovementConfirmed(Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {}
 }

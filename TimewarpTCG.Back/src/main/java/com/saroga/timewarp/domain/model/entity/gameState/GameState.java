@@ -36,6 +36,13 @@ public class GameState {
             this.activePlayerId = playerA.hasPriority() ? playerA.getPlayerId() : playerB.getPlayerId();
     }
 
+    public boolean isBattlefieldContested(CardLocation battlefield) {
+        if (playerA.hasUnitsIn(battlefield) && playerB.hasUnitsIn(battlefield)) {
+            return true;
+        }
+        return false;
+    }
+
     public void newTurn() {
         this.turnNumber = turnNumber.increase();
 
@@ -50,7 +57,7 @@ public class GameState {
 
         playerA.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
         playerB.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
-        
+
         updateScores();
     }
 
@@ -62,6 +69,23 @@ public class GameState {
             if (playerB.hasUnitsIn(lane)) { playerB.scorePoint(); }
         }
     }
+
+    public PlayerState getPlayerById(UUID id) {
+        if (playerA.getPlayerId().equals(id)) {
+            return playerA;
+        }
+        if (playerB.getPlayerId().equals(id)) {
+            return playerB;
+        }
+        throw new IllegalArgumentException("El ID " + id + " no pertenece a ningún jugador de esta partida.");
+    }
+
+    public PlayerState getOpponentOf(UUID id) {
+        return playerA.getPlayerId().equals(id) ? playerB : playerA;
+    }
+
+
+
 
     // efectos de cartas //
 

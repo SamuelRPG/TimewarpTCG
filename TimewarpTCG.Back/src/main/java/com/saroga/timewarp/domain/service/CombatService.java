@@ -22,11 +22,6 @@ public class CombatService {
             throw new IllegalStateException("No hay unidades de ambos jugadores para provocar un combate");
         }
 
-        // 1. AVISO: Las unidades ejecutan sus efectos "Antes del combate"
-        // Aquí es donde el Charge suma el +1 permanente a la vida/ataque real
-        pA.getUnitsIn(lane).forEach(c -> c.beforeCombat());
-        pB.getUnitsIn(lane).forEach(c -> c.beforeCombat());
-
         Drive totalDrivePA = calculateTotalDrive(pA, lane);
         Drive totalDrivePB = calculateTotalDrive(pB, lane);
 
