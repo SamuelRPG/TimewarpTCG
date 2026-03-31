@@ -3,9 +3,7 @@ package com.saroga.timewarp.domain.service;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
-import com.saroga.timewarp.domain.model.enums.CardLocation;
-import com.saroga.timewarp.domain.model.enums.Keyword;
-import com.saroga.timewarp.domain.model.enums.TargetGroup;
+import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
 
 import java.util.List;
@@ -18,14 +16,14 @@ public class CardPlayService {
         PlayerState opponent = gameState.getOpponentOf(playerId);
         boolean contested = gameState.isBattlefieldContested(destination);
 
-        validatePlayCard(actor, card, destination, contested, targets);
+        validatePlayCard(gameState, actor, card, destination, contested, targets);
 
         actor.executePlayCard(card, destination);
 
         gameState.switchPriority();
     }
 
-    public void validatePlayCard(PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {
+    public void validatePlayCard(GameState gameState, PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {
         if (card.getCost().value() > actor.getResource().value()) {
             throw new IllegalStateException("No tienes recurso para jugar esta carta");
         }
@@ -34,9 +32,9 @@ public class CardPlayService {
         }
 
         if (card.isUnit()) {
-            validateUnitRequirements(card, destination, isFieldContested);
+            validateUnitRequirements(gameState, card, destination, isFieldContested);
         } else if (card.isSpell()) {
-
+            validateSpellRequirements(gameState, card, targets);
         }
 
         if (destination == CardLocation.GRAVEYARD ||destination == CardLocation.HAND || destination == CardLocation.DECK) {
@@ -44,7 +42,9 @@ public class CardPlayService {
         }
     }
 
-    private void validateUnitRequirements(Card card, CardLocation destination, boolean isFieldContested) {
+    private void validateUnitRequirements(GameState gameState, Card card, CardLocation destination, boolean isFieldContested) {
+        validateTiming(card, gameState);
+
         if (destination == CardLocation.FIELD_LEFT || destination == CardLocation.FIELD_RIGHT) {
             if (!card.hasKeyword(Keyword.DISRUPTION)) {
                 throw new IllegalStateException("No puedes jugar una carta sin disruption en un battlefield");
@@ -57,13 +57,59 @@ public class CardPlayService {
         }
     }
 
+    private void validateSpellRequirements(GameState gameState, Card card, List<Card> targets) {
+        validateTiming(card, gameState);
+        validateTargets(card, targets);
+    }
+
     private void validateTargets(Card card, List<Card> targets) {
         if (card.getTargetingRequirements().isEmpty() && !targets.isEmpty()) {
             throw new IllegalStateException("No puedes seleccionar unidades si el hechizo no tiene targets pendientes");
         }
+        //este for filtra por cantidad segun grupo. Para cada grupo extrae la cantidad de targets que tiene
+        //la carta en la lista de <TargetingRequirements> y lo compara
+        for (TargetingRequirement req : card.getTargetingRequirements()) {
+            long matchCount = targets.stream()
+                    .filter(t -> matchesGroup(t, card.getOwnerId(), req.targetGroup()))
+                    .count();
 
-        for (TargetingRequirement requirement : card.getTargetingRequirements()) {
+            if (matchCount != req.requiredCount()) {
+                throw new IllegalStateException("Faltan o sobran objetivos de tipo " + req.targetGroup());
+            }
+        }
 
+        int totalRequired = card.getTargetingRequirements().stream()
+                .mapToInt(TargetingRequirement::requiredCount)
+                .sum();
+
+        if (targets.size() != totalRequired) {
+            throw new IllegalStateException("La cantidad total de objetivos no coincide con lo que pide la carta.");
+        }
+    }
+
+    private void validateTiming(Card card, GameState gameState) {
+        SpellSpeed speed = card.getSpellSpeed();
+        GamePhase phase = gameState.getGamePhase();
+
+        // 1. REGLA PARA UNIDADES (Incluyendo las de Disruption)
+        if (card.isUnit()) {
+            if (phase == GamePhase.MAIN_CLOSED || phase == GamePhase.COMBAT_CLOSED) {
+                throw new IllegalStateException("No puedes bajar unidades mientras se están lanzando hechizos.");
+            }
+            if (phase == GamePhase.COMBAT_OPEN) {
+                throw new IllegalStateException("Las unidades no pueden entrar directamente en fase de combate.");
+            }
+        }
+
+        if (card.isSpell()) {
+            if (speed == SpellSpeed.SLOW && (phase != GamePhase.MAIN_OPEN)) {
+                throw new IllegalStateException("Los hechizos SLOW solo se juegan en tu fase principal abierta.");
+            }
+            if (phase == GamePhase.MAIN_CLOSED || phase == GamePhase.COMBAT_CLOSED) {
+                if (speed == SpellSpeed.SLOW) {
+                    throw new IllegalStateException("No puedes responder con un hechizo SLOW.");
+                }
+            }
         }
     }
 

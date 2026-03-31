@@ -96,9 +96,14 @@ public class PlayerState {
         this.resource.spend(card.getCost());
 
         this.getHand().remove(card);
-        addCardToLocation(card, location);
 
-        pendingMoves.add(card);
+        if (card.isSpell()) {
+        } else if (card.isUnit()) {
+            removeCardFromCurrentLocation(card);
+            addCardToLocation(card, location);
+            pendingMoves.add(card);
+        }
+
     }
 
     public void moveCard(Card card, CardLocation destination) {

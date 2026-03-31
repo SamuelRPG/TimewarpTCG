@@ -5,6 +5,7 @@ import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.CardType;
 import com.saroga.timewarp.domain.model.enums.Keyword;
+import com.saroga.timewarp.domain.model.enums.SpellSpeed;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
@@ -26,15 +27,18 @@ public class Card {
     private boolean destroyed;
     private CardLocation cardLocationAtBeginningOfRound;
     private List<TargetingRequirement> targetingRequirements;
+    private SpellSpeed spellSpeed;
 
     private List<Keyword> keywords;
     private List<Effect> effects;
 
-    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements) {
+    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost,
+                CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed) {
         this(id, ownerId, name, initialDrive, drive, cost, cardType); // Llama al de abajo
         this.keywords = keywords != null ? new ArrayList<>(keywords) : new ArrayList<>();
         this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
         this.targetingRequirements = targetingRequirements != null ? new ArrayList<>(targetingRequirements) : new ArrayList<>();
+        this.spellSpeed = spellSpeed;
     }
 
     public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType) {
@@ -57,14 +61,14 @@ public class Card {
                                   List<Keyword> keywords, List<Effect> effects,
                                   List<TargetingRequirement> targetingRequirements) {
         return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost,
-                CardType.UNIT, keywords, effects, targetingRequirements);
+                CardType.UNIT, keywords, effects, targetingRequirements, SpellSpeed.NOT_A_SPELL);
     }
 
     public static Card createSpell(UUID ownerId, String name, Cost cost,
                                    List<Effect> effects,
-                                   List<TargetingRequirement> targetingRequirements) {
+                                   List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed) {
         return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost,
-                CardType.SPELL, new ArrayList<>(), effects, targetingRequirements);
+                CardType.SPELL, new ArrayList<>(), effects, targetingRequirements, spellSpeed);
     }
 
     public boolean isUnit() {
@@ -164,4 +168,6 @@ public class Card {
     public void setCardLocationAtBeginningOfRound(CardLocation cardLocationAtBeginningOfRound) { this.cardLocationAtBeginningOfRound = cardLocationAtBeginningOfRound;}
     public List<TargetingRequirement> getTargetingRequirements() {return targetingRequirements;}
     public void setTargetingRequirements(List<TargetingRequirement> targetingRequirements) {this.targetingRequirements = targetingRequirements;}
+    public SpellSpeed getSpellSpeed() {return spellSpeed;}
+    public void setSpellSpeed(SpellSpeed spellSpeed) {this.spellSpeed = spellSpeed;}
 }

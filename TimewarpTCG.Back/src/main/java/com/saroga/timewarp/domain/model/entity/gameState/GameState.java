@@ -1,9 +1,11 @@
 package com.saroga.timewarp.domain.model.entity.gameState;
 
+import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.enums.Battlefield;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
+import com.saroga.timewarp.domain.model.enums.GamePhase;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
@@ -18,6 +20,8 @@ public class GameState {
     private final PlayerState playerB;
     private Turn turnNumber;
     private Battlefield activeCombatZone;
+    private GamePhase gamePhase;
+    private List<Effect> pendingEffects;
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -25,6 +29,7 @@ public class GameState {
         this.playerB = playerB;
         this.turnNumber = Turn.of(0);
         this.activePlayerId = playerA.getPlayerId();
+        this.gamePhase = GamePhase.MAIN_OPEN;
     }
 
     // logica de turnos y prioridades //
@@ -85,11 +90,6 @@ public class GameState {
     }
 
 
-
-
-    // efectos de cartas //
-
-
     // getter y setter //
 
     public Turn getTurnNumber() {
@@ -118,5 +118,21 @@ public class GameState {
 
     public UUID getGameId() {
         return gameId;
+    }
+
+    public GamePhase getGamePhase() {
+        return gamePhase;
+    }
+
+    public void setGamePhase(GamePhase gamePhase) {
+        this.gamePhase = gamePhase;
+    }
+
+    public List<Effect> getPendingEffects() {
+        return pendingEffects;
+    }
+
+    public void setPendingEffects(List<Effect> pendingEffects) {
+        this.pendingEffects = pendingEffects;
     }
 }
