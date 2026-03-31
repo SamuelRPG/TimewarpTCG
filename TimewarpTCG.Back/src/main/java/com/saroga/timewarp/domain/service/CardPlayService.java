@@ -5,6 +5,7 @@ import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
+import com.saroga.timewarp.domain.model.vo.gameState.QueuedSpell;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +20,25 @@ public class CardPlayService {
         validatePlayCard(gameState, actor, card, destination, contested, targets);
 
         actor.executePlayCard(card, destination);
+
+        if (card.isUnit()) {
+            //disparar efectos de la carta al ser jugada
+            card.onPlaced(actor, opponent, destination, targets);
+        }
+        else if (card.isSpell()) {
+            gameState.pushSpell(QueuedSpell.of(card, targets));
+
+            if (card.getSpellSpeed() == SpellSpeed.FAST) {
+                if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
+                if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
+            }
+            else if (card.getSpellSpeed() == SpellSpeed.SLOW) {
+                if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
+            }
+            else if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
+                gameState.resolveQueue();
+            }
+        }
 
         gameState.switchPriority();
     }
@@ -102,7 +122,7 @@ public class CardPlayService {
         }
 
         if (card.isSpell()) {
-            if (speed == SpellSpeed.SLOW && (phase != GamePhase.MAIN_OPEN)) {
+            if (speed == SpellSpeed.SLOW && !gameState.isStackEmpty() && (phase != GamePhase.MAIN_OPEN)) {
                 throw new IllegalStateException("Los hechizos SLOW solo se juegan en tu fase principal abierta.");
             }
             if (phase == GamePhase.MAIN_CLOSED || phase == GamePhase.COMBAT_CLOSED) {

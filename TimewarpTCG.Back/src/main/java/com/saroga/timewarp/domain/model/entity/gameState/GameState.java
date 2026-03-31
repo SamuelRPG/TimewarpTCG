@@ -6,11 +6,14 @@ import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.enums.Battlefield;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.GamePhase;
+import com.saroga.timewarp.domain.model.vo.gameState.QueuedSpell;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 import java.util.UUID;
 
 public class GameState {
@@ -22,6 +25,7 @@ public class GameState {
     private Battlefield activeCombatZone;
     private GamePhase gamePhase;
     private List<Effect> pendingEffects;
+    private final ArrayList<QueuedSpell> spellStack = new ArrayList<>();
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -30,6 +34,38 @@ public class GameState {
         this.turnNumber = Turn.of(0);
         this.activePlayerId = playerA.getPlayerId();
         this.gamePhase = GamePhase.MAIN_OPEN;
+    }
+
+    // SPELL QUEUE //
+
+    public void pushSpell(QueuedSpell enqueuedSpell) {
+        this.spellStack.add(enqueuedSpell);
+    }
+
+    public void resolveQueue() {
+        if (spellStack.isEmpty()) { return; }
+
+        for (int i = (spellStack.size() -1); i >= 0; i--) {
+            QueuedSpell activeSpell = spellStack.get(i);
+            Card spellCard = activeSpell.card();
+
+            PlayerState owner = this.getPlayerById(spellCard.getOwnerId());
+            PlayerState opponent = getOpponentOf(owner.getPlayerId());
+
+            spellCard.onPlaced(owner, opponent, spellCard.getCardLocation(), activeSpell.targets());
+
+            owner.getGraveyard().add(spellCard);
+            spellCard.setCardLocation(CardLocation.GRAVEYARD);
+        }
+
+        spellStack.clear();
+
+        if (this.gamePhase == GamePhase.MAIN_CLOSED) this.gamePhase = GamePhase.MAIN_OPEN;
+        if (this.gamePhase == GamePhase.COMBAT_CLOSED) this.gamePhase = GamePhase.COMBAT_OPEN;
+    }
+
+    public boolean isStackEmpty() {
+        return spellStack.isEmpty();
     }
 
     // logica de turnos y prioridades //
@@ -74,6 +110,8 @@ public class GameState {
             if (playerB.hasUnitsIn(lane)) { playerB.scorePoint(); }
         }
     }
+
+    // GETTERS POR ID //
 
     public PlayerState getPlayerById(UUID id) {
         if (playerA.getPlayerId().equals(id)) {
@@ -134,5 +172,9 @@ public class GameState {
 
     public void setPendingEffects(List<Effect> pendingEffects) {
         this.pendingEffects = pendingEffects;
+    }
+
+    public List<QueuedSpell> getSpellStack() {
+        return spellStack;
     }
 }

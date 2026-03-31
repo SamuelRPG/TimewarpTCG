@@ -6,6 +6,7 @@ import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
+import com.saroga.timewarp.domain.service.CombatService;
 
 import java.util.*;
 
@@ -101,9 +102,7 @@ public class PlayerState {
         } else if (card.isUnit()) {
             removeCardFromCurrentLocation(card);
             addCardToLocation(card, location);
-            pendingMoves.add(card);
         }
-
     }
 
     public void moveCard(Card card, CardLocation destination) {
@@ -115,24 +114,45 @@ public class PlayerState {
         pendingMoves.add(card);
     }
 
-    public void confirmMoveAndPassPriority(GameState gameState) {
+    public void confirmMoveAndPassPriority(GameState gameState, CombatService combatService) {
         if (!this.priority) {
             throw new IllegalStateException("No puedes confirmar si no tienes la prioridad.");
         }
 
+        if (!gameState.isStackEmpty()) {
+            gameState.resolveQueue();
+        }
+
+        resolvePendingMoves(gameState);
+        checkAndResolveCombat(gameState, combatService);
+
+        this.pendingMoves.clear();
+
+        gameState.switchPriority();
+    }
+
+    private void checkAndResolveCombat(GameState gameState, CombatService combatService) {
+        // Usamos tu CombatService para ver si hay que pegarse
+        if (combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_LEFT)) {
+            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_LEFT);
+        }
+
+        if (combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_RIGHT)) {
+            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_RIGHT);
+        }
+    }
+
+    private void resolvePendingMoves(GameState gameState) {
         PlayerState opponent = gameState.getOpponentOf(this.getPlayerId());
 
         for (Card card : pendingMoves) {
-            if (card.getCardLocation() != card.getCardLocationAtBeginningOfRound()) {
-                if (isField(card.getCardLocation())) {
-                    card.onMovementConfirmed(this, opponent, card.getCardLocation());
-                }
+            if (hasCardMovedThisRound(card)) {
+                card.onMovementConfirmed(this, opponent, card.getCardLocation());
                 card.setCardLocationAtBeginningOfRound(card.getCardLocation());
                 card.exhaust();
             }
         }
-        pendingMoves.clear();
-        gameState.switchPriority();
+
     }
 
     private void removeCardFromCurrentLocation(Card card) {
@@ -169,6 +189,10 @@ public class PlayerState {
                 throw new IllegalStateException("No puedes mover unidades de un field a otro");
             }
         }
+    }
+
+    private boolean hasCardMovedThisRound(Card card) {
+        return card.getCardLocation() != card.getCardLocationAtBeginningOfRound();
     }
 
     private boolean isField(CardLocation location) {
