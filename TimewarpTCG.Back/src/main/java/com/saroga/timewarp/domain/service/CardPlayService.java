@@ -33,10 +33,11 @@ public class CardPlayService {
                 if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
             }
             else if (card.getSpellSpeed() == SpellSpeed.SLOW) {
-                if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
+                if (gameState.getGamePhase() != GamePhase.MAIN_OPEN) throw new IllegalStateException("Slow solo en Main Open");
+                gameState.setGamePhase(GamePhase.MAIN_CLOSED);
             }
             else if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
-                gameState.resolveQueue();
+                card.onPlaced(actor, opponent, destination, targets);
             }
         }
 

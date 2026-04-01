@@ -5,6 +5,7 @@ import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.enums.Battlefield;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
+import com.saroga.timewarp.domain.model.enums.ConsecutivePasses;
 import com.saroga.timewarp.domain.model.enums.GamePhase;
 import com.saroga.timewarp.domain.model.vo.gameState.QueuedSpell;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
@@ -26,6 +27,7 @@ public class GameState {
     private GamePhase gamePhase;
     private List<Effect> pendingEffects;
     private final ArrayList<QueuedSpell> spellStack = new ArrayList<>();
+    private ConsecutivePasses consecutivePasses;
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -34,6 +36,7 @@ public class GameState {
         this.turnNumber = Turn.of(0);
         this.activePlayerId = playerA.getPlayerId();
         this.gamePhase = GamePhase.MAIN_OPEN;
+        this.consecutivePasses = ConsecutivePasses.ZERO;
     }
 
     // SPELL QUEUE //
@@ -59,13 +62,25 @@ public class GameState {
         }
 
         spellStack.clear();
-
-        if (this.gamePhase == GamePhase.MAIN_CLOSED) this.gamePhase = GamePhase.MAIN_OPEN;
-        if (this.gamePhase == GamePhase.COMBAT_CLOSED) this.gamePhase = GamePhase.COMBAT_OPEN;
+        openCurrentPhase();
     }
 
     public boolean isStackEmpty() {
         return spellStack.isEmpty();
+    }
+
+    // pases consecutivos //
+
+    public void addConsecutivePass() {
+        switch (this.getConsecutivePasses()) {
+            case ConsecutivePasses.ZERO -> consecutivePasses = ConsecutivePasses.ONE;
+            case ConsecutivePasses.ONE -> consecutivePasses = ConsecutivePasses.TWO;
+            case ConsecutivePasses.TWO -> consecutivePasses = ConsecutivePasses.TWO;
+        }
+    }
+
+    public void resetConsecutivePasses() {
+        this.consecutivePasses = ConsecutivePasses.ZERO;
     }
 
     // logica de turnos y prioridades //
@@ -127,6 +142,23 @@ public class GameState {
         return playerA.getPlayerId().equals(id) ? playerB : playerA;
     }
 
+    // En GameState.java
+    public void openCurrentPhase() {
+        if (this.gamePhase == GamePhase.MAIN_CLOSED) {
+            this.gamePhase = GamePhase.MAIN_OPEN;
+        } else if (this.gamePhase == GamePhase.COMBAT_CLOSED) {
+            this.gamePhase = GamePhase.COMBAT_OPEN;
+        }
+        // Si ya estaba OPEN, no hace nada.
+    }
+
+    public void closeCurrentPhase() {
+        if (this.gamePhase == GamePhase.MAIN_OPEN) {
+            this.gamePhase = GamePhase.MAIN_CLOSED;
+        } else if (this.gamePhase == GamePhase.COMBAT_OPEN) {
+            this.gamePhase = GamePhase.COMBAT_CLOSED;
+        }
+    }
 
     // getter y setter //
 
@@ -176,5 +208,13 @@ public class GameState {
 
     public List<QueuedSpell> getSpellStack() {
         return spellStack;
+    }
+
+    public ConsecutivePasses getConsecutivePasses() {
+        return consecutivePasses;
+    }
+
+    public void setConsecutivePasses(ConsecutivePasses consecutivePasses) {
+        this.consecutivePasses = consecutivePasses;
     }
 }
