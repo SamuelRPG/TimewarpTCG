@@ -3,10 +3,7 @@ package com.saroga.timewarp.domain.model.entity.gameState;
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.entity.card.Card;
-import com.saroga.timewarp.domain.model.enums.Battlefield;
-import com.saroga.timewarp.domain.model.enums.CardLocation;
-import com.saroga.timewarp.domain.model.enums.ConsecutivePasses;
-import com.saroga.timewarp.domain.model.enums.GamePhase;
+import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.gameState.QueuedSpell;
 import com.saroga.timewarp.domain.model.vo.gameState.Turn;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
@@ -28,6 +25,8 @@ public class GameState {
     private List<Effect> pendingEffects;
     private final ArrayList<QueuedSpell> spellStack = new ArrayList<>();
     private ConsecutivePasses consecutivePasses;
+    private GameStatus gameStatus;
+    private UUID winnerId;
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -37,6 +36,8 @@ public class GameState {
         this.activePlayerId = playerA.getPlayerId();
         this.gamePhase = GamePhase.MAIN_OPEN;
         this.consecutivePasses = ConsecutivePasses.ZERO;
+        this.gameStatus = GameStatus.ONGOING;
+        winnerId = null;
     }
 
     // SPELL QUEUE //
@@ -100,6 +101,13 @@ public class GameState {
     }
 
     public void newTurn() {
+        updateScores();
+        checkWinCondition();
+
+        if (this.gameStatus == GameStatus.FINISHED) {
+            return;
+        }
+
         this.turnNumber = turnNumber.increase();
 
         playerA.setResource(Resource.newTurnResource(this.turnNumber));
@@ -114,7 +122,9 @@ public class GameState {
         playerA.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
         playerB.getAllCardsOnBoard().forEach(c -> c.setCardLocationAtBeginningOfRound(c.getCardLocation()));
 
-        updateScores();
+        this.gamePhase = GamePhase.MAIN_OPEN;
+        this.consecutivePasses = ConsecutivePasses.ZERO;
+        this.spellStack.clear();
     }
 
     private void updateScores() {
@@ -123,6 +133,26 @@ public class GameState {
         for (CardLocation lane : possibleScoringLocations) {
             if (playerA.hasUnitsIn(lane)) { playerA.scorePoint(); }
             if (playerB.hasUnitsIn(lane)) { playerB.scorePoint(); }
+        }
+    }
+
+    private void checkWinCondition() {
+        int scoreA = playerA.getScore().value(); // Asumiendo que tu Score tiene un .value()
+        int scoreB = playerB.getScore().value();
+
+        boolean aReachesLimit = scoreA >= 10;
+        boolean bReachesLimit = scoreB >= 10;
+        boolean hasTwoPointMargin = Math.abs(scoreA - scoreB) >= 2;
+
+        // Si alguien llegó a 10 Y hay una ventaja de 2 puntos
+        if ((aReachesLimit || bReachesLimit) && hasTwoPointMargin) {
+            this.gameStatus = GameStatus.FINISHED;
+
+            if (scoreA > scoreB) {
+                this.winnerId = playerA.getPlayerId();
+            } else {
+                this.winnerId = playerB.getPlayerId();
+            }
         }
     }
 

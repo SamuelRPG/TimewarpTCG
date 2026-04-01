@@ -35,7 +35,6 @@ public class CombatService {
             PlayerState winner = determineWinner(pA, pB, totalDrivePA, totalDrivePB);
             notifyVictory(winner, lane);
         }
-        gameState.setGamePhase(GamePhase.MAIN_OPEN);
     }
 
     private PlayerState determineWinner(PlayerState pA, PlayerState pB, Drive powerA, Drive powerB) {
