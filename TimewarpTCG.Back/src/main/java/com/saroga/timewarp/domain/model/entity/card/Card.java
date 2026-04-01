@@ -34,14 +34,6 @@ public class Card {
 
     public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost,
                 CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed) {
-        this(id, ownerId, name, initialDrive, drive, cost, cardType); // Llama al de abajo
-        this.keywords = keywords != null ? new ArrayList<>(keywords) : new ArrayList<>();
-        this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
-        this.targetingRequirements = targetingRequirements != null ? new ArrayList<>(targetingRequirements) : new ArrayList<>();
-        this.spellSpeed = spellSpeed;
-    }
-
-    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost, CardType cardType) {
         this.id = id;
         this.ownerId = ownerId; // para saber a que jugador pertenece la carta
         this.name = name;
@@ -52,9 +44,11 @@ public class Card {
         this.cardLocation = CardLocation.DECK; // la carta empieza en el mazo
         this.exhausted = true;
         this.destroyed = false;
-        this.keywords = new ArrayList<>();
-        this.effects = new ArrayList<>();
         this.cardLocationAtBeginningOfRound = CardLocation.DECK;
+        this.keywords = keywords != null ? new ArrayList<>(keywords) : new ArrayList<>();
+        this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
+        this.targetingRequirements = targetingRequirements != null ? new ArrayList<>(targetingRequirements) : new ArrayList<>();
+        this.spellSpeed = spellSpeed;
     }
 
     public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost,

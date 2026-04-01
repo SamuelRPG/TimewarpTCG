@@ -24,24 +24,29 @@ public class CardPlayService {
         if (card.isUnit()) {
             //disparar efectos de la carta al ser jugada
             card.onPlaced(actor, opponent, destination, targets);
+            gameState.resetConsecutivePasses();
+            gameState.switchPriority();
         }
         else if (card.isSpell()) {
-            gameState.pushSpell(QueuedSpell.of(card, targets));
-
-            if (card.getSpellSpeed() == SpellSpeed.FAST) {
-                if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
-                if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
-            }
-            else if (card.getSpellSpeed() == SpellSpeed.SLOW) {
-                if (gameState.getGamePhase() != GamePhase.MAIN_OPEN) throw new IllegalStateException("Slow solo en Main Open");
-                gameState.setGamePhase(GamePhase.MAIN_CLOSED);
-            }
-            else if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
+            if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
+                // Los instant se aplican YA y NO van a la pila
                 card.onPlaced(actor, opponent, destination, targets);
+            } else {
+                // Solo Fast y Slow van a la pila
+                gameState.pushSpell(QueuedSpell.of(card, targets));
+
+                if (card.getSpellSpeed() == SpellSpeed.FAST) {
+                    if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
+                    if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
+                }
+                else if (card.getSpellSpeed() == SpellSpeed.SLOW) {
+                    if (gameState.getGamePhase() != GamePhase.MAIN_OPEN) throw new IllegalStateException("Slow solo en Main Open");
+                    gameState.setGamePhase(GamePhase.MAIN_CLOSED);
+                }
+                gameState.resetConsecutivePasses();
+                gameState.switchPriority();
             }
         }
-
-        gameState.switchPriority();
     }
 
     public void validatePlayCard(GameState gameState, PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {

@@ -58,8 +58,11 @@ public class PlayerState {
             return;
         }
 
-        hand.add(deck.getFirst());
+        Card drawnCard = deck.getFirst();
+        hand.add(drawnCard);
         deck.removeFirst();
+
+        drawnCard.setCardLocation(CardLocation.HAND);
     }
 
     public void readyAllCards() {
@@ -104,6 +107,7 @@ public class PlayerState {
         } else if (card.isUnit()) {
             removeCardFromCurrentLocation(card);
             addCardToLocation(card, location);
+            card.setCardLocation(location);
         }
     }
 
