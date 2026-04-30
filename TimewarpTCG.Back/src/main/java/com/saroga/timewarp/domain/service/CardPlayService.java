@@ -71,6 +71,12 @@ public class CardPlayService {
     private void validateUnitRequirements(GameState gameState, Card card, CardLocation destination, boolean isFieldContested) {
         validateTiming(card, gameState);
 
+        PlayerState actor = gameState.getPlayerById(card.getOwnerId());
+
+        if (actor.getUnitsIn(destination).size() >= 6) {
+            throw new IllegalStateException("La zona de destino ya ha alcanzado el límite máximo de 6 unidades.");
+        }
+
         if (destination == CardLocation.FIELD_LEFT || destination == CardLocation.FIELD_RIGHT) {
             if (!card.hasKeyword(Keyword.DISRUPTION)) {
                 throw new IllegalStateException("No puedes jugar una carta sin disruption en un battlefield");

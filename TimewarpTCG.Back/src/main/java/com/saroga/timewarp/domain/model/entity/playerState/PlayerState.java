@@ -1,14 +1,10 @@
 package com.saroga.timewarp.domain.model.entity.playerState;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
-import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
-import com.saroga.timewarp.domain.model.enums.ConsecutivePasses;
-import com.saroga.timewarp.domain.model.enums.GamePhase;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
 import com.saroga.timewarp.domain.model.vo.playerState.Score;
-import com.saroga.timewarp.domain.service.CombatService;
 
 import java.util.*;
 
@@ -55,7 +51,7 @@ public class PlayerState {
 
     public void drawCard() {
         if (deck.isEmpty()) {
-            return;
+            return; // MVP: Simplemente no roba (sin daño por fatiga aún)
         }
 
         Card drawnCard = deck.getFirst();
@@ -100,10 +96,10 @@ public class PlayerState {
 
     public void executePlayCard(Card card, CardLocation location) {
         this.resource.spend(card.getCost());
-
         this.getHand().remove(card);
 
         if (card.isSpell()) {
+            // Los hechizos se gestionan en CardPlayService o en Pila
         } else if (card.isUnit()) {
             removeCardFromCurrentLocation(card);
             addCardToLocation(card, location);
@@ -117,107 +113,7 @@ public class PlayerState {
         addCardToLocation(card, destination);
 
         card.setCardLocation(destination);
-        pendingMoves.add(card);
-    }
-
-    public void confirmMoveAndPassPriority(GameState gameState, CombatService combatService) {
-        if (!this.priority) {
-            throw new IllegalStateException("No tienes la prioridad.");
-        }
-
-        boolean hasMovedUnits = !this.pendingMoves.isEmpty();
-        boolean hasSpells = !gameState.isStackEmpty();
-
-        // --- 1. PROCESAR ACCIONES FÍSICAS ---
-        if (hasMovedUnits) {
-            resolvePendingMoves(gameState);
-            updatePhaseAfterMovement(gameState, combatService);
-            this.pendingMoves.clear();
-            gameState.resetConsecutivePasses(); // Al actuar, el rival vuelve a tener ventana
-
-            gameState.switchPriority();
-        }
-
-        // --- 2. GESTIONAR PASES CONSECUTIVOS ---
-        // Entramos aquí si el jugador NO ha movido unidades (ha dado a "Pasar/Aceptar")
-        else {
-            gameState.addConsecutivePass();
-            // --- 3. ¿QUÉ OCURRE TRAS EL PASE? ---
-            if (gameState.getConsecutivePasses() == ConsecutivePasses.TWO) {
-
-                if (hasSpells) {
-                    // Caso A: Había hechizos -> Se resuelve la pila
-                    gameState.resolveQueue();
-                    gameState.resetConsecutivePasses();
-
-                    gameState.switchPriority();
-                    // IMPORTANTE: Tras resolver hechizos, NO suele haber combate automático,
-                    // se abre otra ventana de reacción.
-                } else {
-                    // Caso B: No había hechizos y es el segundo pase -> Resolución de Fase
-                    handlePhaseEnd(gameState, combatService);
-                    gameState.resetConsecutivePasses();
-                }
-            } else {
-                gameState.switchPriority();
-            }
-        }
-
-    }
-
-    private void handlePhaseEnd(GameState gameState, CombatService combatService) {
-        GamePhase currentPhase = gameState.getGamePhase();
-
-        // Si ambos pasan en fase de combate, se ejecutan las tortas
-        if (currentPhase == GamePhase.COMBAT_OPEN || currentPhase == GamePhase.COMBAT_CLOSED) {
-            checkAndResolveCombat(gameState, combatService);
-            // Tras el combate, podrías volver a MAIN o terminar ronda
-        }
-        // Si ambos pasan en fase principal, se termina la ronda o se cambia de turno
-        else if (currentPhase == GamePhase.MAIN_OPEN || currentPhase == GamePhase.MAIN_CLOSED) {
-            gameState.newTurn();
-        }
-    }
-
-    private void checkAndResolveCombat(GameState gameState, CombatService combatService) {
-        // Usamos tu CombatService para ver si hay que pegarse
-        if (combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_LEFT)) {
-            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_LEFT);
-        }
-
-        if (combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_RIGHT)) {
-            combatService.resolveLaneCombat(gameState, CardLocation.FIELD_RIGHT);
-        }
-
-        gameState.setGamePhase(GamePhase.MAIN_OPEN);
-    }
-
-    private void resolvePendingMoves(GameState gameState) {
-        PlayerState opponent = gameState.getOpponentOf(this.getPlayerId());
-
-        for (Card card : pendingMoves) {
-            if (hasCardMovedThisRound(card)) {
-                card.onMovementConfirmed(this, opponent, card.getCardLocation());
-                card.setCardLocationAtBeginningOfRound(card.getCardLocation());
-                card.exhaust();
-            }
-        }
-    }
-
-    private void updatePhaseAfterMovement(GameState gameState, CombatService combatService) {
-        // Si ya estamos en combate, no hace falta chequear nada
-        if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN ||
-                gameState.getGamePhase() == GamePhase.COMBAT_CLOSED) return;
-
-        // Miramos si alguno de los dos carriles tiene ahora unidades de ambos bandos
-        boolean isContested =
-                combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_LEFT) ||
-                        combatService.hasFieldUnitsFromBothPlayers(gameState.getPlayerA(), gameState.getPlayerB(), CardLocation.FIELD_RIGHT);
-
-        if (isContested) {
-            // Promocionamos la fase a Combate Abierto
-            gameState.setGamePhase(GamePhase.COMBAT_OPEN);
-        }
+        pendingMoves.add(card); // Registramos el movimiento para el GameFlowService
     }
 
     private void removeCardFromCurrentLocation(Card card) {
@@ -254,17 +150,22 @@ public class PlayerState {
                 throw new IllegalStateException("No puedes mover unidades de un field a otro");
             }
         }
-    }
 
-    private boolean hasCardMovedThisRound(Card card) {
-        return card.getCardLocation() != card.getCardLocationAtBeginningOfRound();
+        // --- NUEVA REGLA: LÍMITE DE MESA PARA MVP ---
+        if (getUnitsIn(destination).size() >= 6) {
+            throw new IllegalStateException("La zona de destino ya ha alcanzado el límite máximo de 6 unidades.");
+        }
     }
 
     private boolean isField(CardLocation location) {
         return location == CardLocation.FIELD_LEFT || location == CardLocation.FIELD_RIGHT;
     }
 
-    // getter y setter //
+    // --- GETTERS Y SETTERS ---
+
+    public Set<Card> getPendingMoves() {
+        return pendingMoves;
+    }
 
     public Score getPoints() {
         return score;
