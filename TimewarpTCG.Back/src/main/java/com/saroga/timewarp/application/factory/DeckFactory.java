@@ -37,7 +37,7 @@ public class DeckFactory {
 
         // 20 Muros Defensivos
         for (int i = 0; i < 20; i++) {
-            cards.add(Card.createUnit(ownerId, "Muro de Energía", Drive.of(4), Cost.of(2),
+            cards.add(Card.createUnit(ownerId, "Muro de Energía", Drive.of(4), Cost.of(1),
                     new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
         }
 
