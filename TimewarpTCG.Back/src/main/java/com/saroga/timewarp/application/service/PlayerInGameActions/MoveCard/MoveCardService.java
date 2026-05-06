@@ -6,9 +6,11 @@ import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Service
 public class MoveCardService implements MoveCardUseCase {
     @Override
     public void execute(GameState game, UUID playerId, UUID cardId, CardLocation destination) {

@@ -9,11 +9,13 @@ import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.TargetGroup;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
+import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+@Service
 public class BotBrainService {
 
     private final PlayCardUseCase playCardUseCase;
@@ -28,8 +30,8 @@ public class BotBrainService {
 
     public void takeTurn(GameState game) {
         // 1. Obtenemos al Bot (Para el MVP asumimos que siempre es el Jugador B)
-        PlayerState bot = game.getPlayerB();
-        PlayerState human = game.getPlayerA();
+        PlayerState bot = game.getPlayerA().isBot() ? game.getPlayerA() : game.getPlayerB();
+        PlayerState human = bot.getPlayerId().equals(game.getPlayerA().getPlayerId()) ? game.getPlayerB() : game.getPlayerA();
 
         // Seguridad: Si no es el turno del bot o no tiene prioridad, ignoramos
         if (!bot.hasPriority()) return;

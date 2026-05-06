@@ -5,9 +5,12 @@ import com.saroga.timewarp.application.ports.in.StartMatch.StartMatchUseCase;
 import com.saroga.timewarp.domain.model.entity.deck.Deck;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
+import org.springframework.stereotype.Service;
 
+import java.util.Random;
 import java.util.UUID;
 
+@Service
 public class StartMatchService implements StartMatchUseCase {
 
     private final DeckFactory deckFactory;
@@ -27,9 +30,11 @@ public class StartMatchService implements StartMatchUseCase {
         UUID botId = UUID.randomUUID();
         Deck botDeck = deckFactory.getDeckByName("CONTROL", botId);
 
-        // 3. Inicializamos los estados
-        PlayerState pA = new PlayerState(playerId, playerDeck.getCards(), true);
-        PlayerState pB = new PlayerState(botId, botDeck.getCards(), false);
+        boolean hasInitialPriority = new Random().nextBoolean();
+
+        // asumo que el bot es el jugador B
+        PlayerState pA = new PlayerState(playerId, playerDeck.getCards(), hasInitialPriority, false);
+        PlayerState pB = new PlayerState(botId, botDeck.getCards(), !hasInitialPriority, true);
 
         // 4. Creamos la partida global
         UUID newGameId = UUID.randomUUID();

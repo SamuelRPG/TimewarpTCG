@@ -14,6 +14,7 @@ public class PlayerState {
     private Resource resource;
     private Score score;
     private Set<Card> pendingMoves = new HashSet<>();
+    private boolean isBot;
 
     private List<Card> deck;
     private List<Card> hand;
@@ -27,6 +28,21 @@ public class PlayerState {
         this.priority = hasPriority;
         this.resource = Resource.of(1);
         this.score = Score.of(0);
+
+        this.deck = deck;
+        this.hand = new ArrayList<>();
+        this.graveyard = new ArrayList<>();
+        this.base = new ArrayList<>();
+        this.fieldLeft = new ArrayList<>();
+        this.fieldRight = new ArrayList<>();
+    }
+
+    public PlayerState(UUID playerId, List<Card> deck, boolean hasPriority, boolean isBot) {
+        this.playerId = playerId;
+        this.priority = hasPriority;
+        this.resource = Resource.of(1);
+        this.score = Score.of(0);
+        this.isBot = isBot;
 
         this.deck = deck;
         this.hand = new ArrayList<>();
@@ -225,5 +241,9 @@ public class PlayerState {
 
     public List<Card> getFieldRight() {
         return fieldRight;
+    }
+
+    public boolean isBot() {
+        return isBot;
     }
 }

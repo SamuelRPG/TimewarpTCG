@@ -4,9 +4,11 @@ import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PassPriority
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.service.CombatService;
 import com.saroga.timewarp.domain.service.GameFlowService;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Service
 public class PassPriorityService implements PassPriorityUseCase {
     private final GameFlowService gameFlowService;
     private final CombatService combatService;

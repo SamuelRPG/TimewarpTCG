@@ -33,7 +33,7 @@ public class GameState {
         this.playerA = playerA;
         this.playerB = playerB;
         this.turnNumber = Turn.of(0);
-        this.activePlayerId = playerA.getPlayerId();
+        this.activePlayerId = playerA.hasPriority() ? playerA.getPlayerId() : playerB.getPlayerId();
         this.gamePhase = GamePhase.MAIN_OPEN;
         this.consecutivePasses = ConsecutivePasses.ZERO;
         this.gameStatus = GameStatus.ONGOING;
@@ -166,6 +166,23 @@ public class GameState {
             return playerB;
         }
         throw new IllegalArgumentException("El ID " + id + " no pertenece a ningún jugador de esta partida.");
+    }
+
+    public Card getCardById(UUID cardId) {
+        List<Card> allCardsInGame = new ArrayList<>();
+
+        allCardsInGame.addAll(playerA.getAllCardsOnBoard());
+        allCardsInGame.addAll(playerA.getHand());
+        allCardsInGame.addAll(playerA.getGraveyard());
+
+        allCardsInGame.addAll(playerB.getAllCardsOnBoard());
+        allCardsInGame.addAll(playerB.getHand());
+        allCardsInGame.addAll(playerB.getGraveyard());
+
+        return allCardsInGame.stream()
+                .filter(c -> c.getId() == cardId)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No se encontro la carta"));
     }
 
     public PlayerState getOpponentOf(UUID id) {

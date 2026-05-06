@@ -6,10 +6,12 @@ import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.service.CardPlayService;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@Service
 public class PlayCardService implements PlayCardUseCase {
     private final CardPlayService cardPlayService; // El servicio de tu Dominio
 
