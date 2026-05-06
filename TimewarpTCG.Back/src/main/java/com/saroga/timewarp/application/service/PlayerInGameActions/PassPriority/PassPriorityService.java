@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-@Service
 public class PassPriorityService implements PassPriorityUseCase {
     private final GameFlowService gameFlowService;
     private final CombatService combatService;

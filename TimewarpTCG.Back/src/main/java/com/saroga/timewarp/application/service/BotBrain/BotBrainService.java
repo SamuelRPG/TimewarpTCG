@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-@Service
 public class BotBrainService {
 
     private final PlayCardUseCase playCardUseCase;
