@@ -1,5 +1,6 @@
 package com.saroga.timewarp.infrastructure.persistence.jpa.mapper;
 
+import com.saroga.timewarp.application.factory.EffectFactory;
 import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
 import com.saroga.timewarp.domain.model.enums.CardType;
 import com.saroga.timewarp.domain.model.enums.Keyword;
@@ -18,6 +19,13 @@ import java.util.stream.Collectors;
 
 @Component
 public class CardTemplateMapper {
+
+    private final EffectFactory effectFactory;
+
+    public CardTemplateMapper(EffectFactory effectFactory) {
+        this.effectFactory = effectFactory;
+    }
+
     public CardTemplate toDomain (CardTemplateEntity entity) {
         return new CardTemplate(
                 entity.getId(),
@@ -29,7 +37,7 @@ public class CardTemplateMapper {
                 SpellSpeed.valueOf(entity.getSpellSpeed()),
                 mapTargeting(entity),
                 mapKeywords(entity.getKeywords()),
-                new ArrayList<>()
+                effectFactory.createEffects(entity.getEffects())
         );
     }
 

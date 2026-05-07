@@ -29,7 +29,6 @@ public class CardPlayService {
         }
         else if (card.isSpell()) {
             if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
-                // Los instant se aplican YA y NO van a la pila
                 card.onPlaced(actor, opponent, destination, targets);
                 actor.getGraveyard().add(card);
                 card.setCardLocation(CardLocation.GRAVEYARD);
@@ -128,7 +127,6 @@ public class CardPlayService {
         SpellSpeed speed = card.getSpellSpeed();
         GamePhase phase = gameState.getGamePhase();
 
-        // 1. REGLA PARA UNIDADES (Incluyendo las de Disruption)
         if (card.isUnit()) {
             if (phase == GamePhase.MAIN_CLOSED || phase == GamePhase.COMBAT_CLOSED) {
                 throw new IllegalStateException("No puedes bajar unidades mientras se están lanzando hechizos.");
