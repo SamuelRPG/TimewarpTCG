@@ -27,6 +27,7 @@ public class GameState {
     private ConsecutivePasses consecutivePasses;
     private GameStatus gameStatus;
     private UUID winnerId;
+    private UUID roundStartPlayerId;
 
     public GameState(UUID id, PlayerState playerA, PlayerState playerB) {
         this.gameId = id;
@@ -38,6 +39,7 @@ public class GameState {
         this.consecutivePasses = ConsecutivePasses.ZERO;
         this.gameStatus = GameStatus.ONGOING;
         winnerId = null;
+        this.roundStartPlayerId = activePlayerId;
     }
 
     // SPELL QUEUE //
@@ -109,6 +111,15 @@ public class GameState {
         }
 
         this.turnNumber = turnNumber.increase();
+
+        this.roundStartPlayerId =getOpponentOf(roundStartPlayerId).getPlayerId();
+
+        PlayerState firstToAct = getPlayerById(roundStartPlayerId);
+        PlayerState secondToAct = getOpponentOf(firstToAct.getPlayerId());
+
+        firstToAct.setPriority(true);
+        secondToAct.setPriority(false);
+        this.activePlayerId = firstToAct.getPlayerId();
 
         playerA.setResource(Resource.newTurnResource(this.turnNumber));
         playerB.setResource(Resource.newTurnResource(this.turnNumber));
