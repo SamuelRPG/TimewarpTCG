@@ -111,7 +111,7 @@ public class PlayerState {
     }
 
     public void executePlayCard(Card card, CardLocation location) {
-        this.resource.spend(card.getCost());
+        this.setResource(this.resource.spend(card.getCost()));
         this.getHand().remove(card);
 
         if (card.isSpell()) {

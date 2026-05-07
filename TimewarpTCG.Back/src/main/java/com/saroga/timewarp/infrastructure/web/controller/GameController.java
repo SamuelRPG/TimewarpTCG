@@ -111,7 +111,7 @@ public class GameController {
     private void checkBotTurn(GameState game) {
         PlayerState activePlayer = game.getPlayerById(game.getActivePlayerId());
 
-        if (activePlayer.isBot()) {
+        while (game.getPlayerById(game.getActivePlayerId()).isBot()) {
             botBrainService.takeTurn(game);
             gameRepository.save(game);
         }
@@ -120,6 +120,11 @@ public class GameController {
     private void broadcastGame(GameState game) {
         sendToPlayer(game, game.getPlayerA().getPlayerId());
         sendToPlayer(game, game.getPlayerB().getPlayerId());
+
+
+    //el dia que sea multijugador, aqui tambien habra que añadir la ruta del jugador B. En este caso el jugador A siempre es el humano
+        simpMessagingTemplate.convertAndSend("/topic/player/" + game.getPlayerA().getPlayerId(),
+                GameStateMapper.toGameStateDto(game, game.getPlayerA().getPlayerId()));
     }
     private void sendToPlayer(GameState game, UUID playerId) {
         GameStateDto dto = GameStateMapper.toGameStateDto(game, playerId);
