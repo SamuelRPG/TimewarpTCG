@@ -25,14 +25,16 @@ public class MoveCardService implements MoveCardUseCase {
     public void execute(GameState game, UUID playerId, UUID cardId, CardLocation destination) {
         PlayerState actor = game.getPlayerById(playerId);
 
+        if (!actor.hasPriority()) {
+            throw new IllegalStateException("No puedes mover cartas si no es tu turno.");
+        }
+
         Card cardToMove = actor.getAllCardsOnBoard().stream()
                 .filter(c -> c.getId().equals(cardId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("La carta no está en el tablero"));
 
         actor.moveCard(cardToMove, destination);
-
-        gameFlowService.confirmMoveAndPassPriority(game, playerId, combatService);
     }
 
 }

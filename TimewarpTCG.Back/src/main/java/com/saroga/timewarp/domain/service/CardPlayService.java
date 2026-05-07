@@ -31,6 +31,8 @@ public class CardPlayService {
             if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
                 // Los instant se aplican YA y NO van a la pila
                 card.onPlaced(actor, opponent, destination, targets);
+                actor.getGraveyard().add(card);
+                card.setCardLocation(CardLocation.GRAVEYARD);
             } else {
                 // Solo Fast y Slow van a la pila
                 gameState.pushSpell(QueuedSpell.of(card, targets));
@@ -50,6 +52,9 @@ public class CardPlayService {
     }
 
     public void validatePlayCard(GameState gameState, PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {
+        if (!actor.getPendingMoves().isEmpty()) {
+            throw new IllegalStateException("No puedes jugar cartas si ya has movido unidades. Confirma tus movimientos pasando la prioridad.");
+        }
         if (card.getCost().value() > actor.getResource().value()) {
             throw new IllegalStateException("No tienes recurso para jugar esta carta");
         }

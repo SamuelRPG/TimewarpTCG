@@ -191,7 +191,7 @@ public class GameState {
         allCardsInGame.addAll(playerB.getGraveyard());
 
         return allCardsInGame.stream()
-                .filter(c -> c.getId() == cardId)
+                .filter(c -> c.getId().equals(cardId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No se encontro la carta"));
     }

@@ -35,6 +35,11 @@ public class BotBrainService {
         // Seguridad: Si no es el turno del bot o no tiene prioridad, ignoramos
         if (!bot.hasPriority()) return;
 
+        if (!bot.getPendingMoves().isEmpty()) {
+            passPriorityUseCase.execute(game, bot.getPlayerId());
+            return;
+        }
+
         // --- REGLA 1: DEFENSA DE EMERGENCIA ---
         // Si el humano tiene tropas en FIELD_LEFT y yo no tengo a nadie defendiendo ahí
         if (human.hasUnitsIn(CardLocation.FIELD_LEFT) && !bot.hasUnitsIn(CardLocation.FIELD_LEFT)) {

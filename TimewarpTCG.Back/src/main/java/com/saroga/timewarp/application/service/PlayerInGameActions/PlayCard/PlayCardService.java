@@ -22,6 +22,10 @@ public class PlayCardService implements PlayCardUseCase {
     public void execute(GameState game, UUID playerId, UUID cardId, CardLocation destination, List<Card> targets) {
         PlayerState actor = game.getPlayerById(playerId);
 
+        if (!actor.hasPriority()) {
+            throw new IllegalStateException("No puedes mover cartas si no es tu turno.");
+        }
+
         Card cardToPlay = actor.getHand().stream()
                 .filter(c -> c.getId().equals(cardId))
                 .findFirst()
