@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain.model.effect.effectInterface;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
+import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
@@ -8,12 +9,13 @@ import com.saroga.timewarp.domain.model.vo.card.Drive;
 import java.util.List;
 
 public interface Effect {
-    default void onCombatWin(Card card, PlayerState owner, CardLocation lane) { }
-    default void onDamageTaken(Card card, Drive drive) {}
-    default void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {}
-    default void onOtherUnitPlaced(Card card, PlayerState owner, CardLocation lane) {}
-    default void onCombat(Card card, PlayerState owner, CardLocation lane) {}
-    default int modifyDrive(Card card) {return 0;}
-    default void beforeCombat(Card card) {}
-    default void onMovementConfirmed(Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {}
+    default void onCombatWin(GameState game, Card card, PlayerState owner, CardLocation lane) { }
+    default void onDamageTaken(GameState game,Card card, Drive drive) {}
+    default void onPlaced(GameState game, Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {}
+    default void onOtherUnitPlaced(GameState game,Card card, PlayerState owner, CardLocation lane) {}
+    default void onCombat(GameState game,Card card, PlayerState owner, CardLocation lane) {}
+    default int modifyDrive(GameState game,Card card) {return 0;}
+    default void beforeCombat(GameState game,Card card) {}
+    default void onMovementConfirmed(GameState game,Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {}
+    default void onDestroyed(GameState game,Card card) {}
 }

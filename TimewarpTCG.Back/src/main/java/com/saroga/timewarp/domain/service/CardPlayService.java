@@ -23,13 +23,13 @@ public class CardPlayService {
 
         if (card.isUnit()) {
             //disparar efectos de la carta al ser jugada
-            card.onPlaced(actor, opponent, destination, targets);
+            card.onPlaced(gameState, actor, opponent, destination, targets);
             gameState.resetConsecutivePasses();
             gameState.switchPriority();
         }
         else if (card.isSpell()) {
             if (card.getSpellSpeed() == SpellSpeed.INSTANT) {
-                card.onPlaced(actor, opponent, destination, targets);
+                card.onPlaced(gameState, actor, opponent, destination, targets);
                 actor.getGraveyard().add(card);
                 card.setCardLocation(CardLocation.GRAVEYARD);
             } else {

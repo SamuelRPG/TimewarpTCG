@@ -44,7 +44,7 @@ public class GameFlowTest {
 
         List<Effect> dummyDamageEffect = List.of(new Effect() {
             @Override
-            public void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {
+            public void onPlaced(GameState game,Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {
                 System.out.println("Efecto ejecutado sobre: " + targets.getFirst().getName());
             }
         });

@@ -24,4 +24,7 @@ INSERT INTO card_templates (
 
 -- 5. Hechizo Rápido de Daño (Requiere elegir a 1 Enemigo para dañarlo)
 ('S_GP_01', 'Virus Táctico', 'Inflige 3 de daño a una unidad enemiga.',
- 2, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'GLITCHPOP');
+ 2, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'GLITCHPOP'),
+
+('U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5',
+    4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS');

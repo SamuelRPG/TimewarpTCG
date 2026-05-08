@@ -4,6 +4,7 @@ import com.saroga.timewarp.domain.model.effect.action.Action;
 import com.saroga.timewarp.domain.model.effect.action.allyBoost.AllyBoostAction;
 import com.saroga.timewarp.domain.model.effect.action.charge.ChargeAction;
 import com.saroga.timewarp.domain.model.effect.action.enemyDamage.EnemyDamageAction;
+import com.saroga.timewarp.domain.model.effect.action.hunterMark.HunterMarkAction;
 import com.saroga.timewarp.domain.model.effect.action.readySelf.ReadySelfAction;
 import com.saroga.timewarp.domain.model.effect.action.selfBuff.SelfBuffAction;
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
@@ -40,6 +41,7 @@ public class EffectFactory {
 
         // Dividimos múltiples efectos si los hubiera: "ON_PLACED:ENEMY_DAMAGE:2 ; ON_DAMAGE_TAKEN:SELF_BUFF:1"
         String[] rules = effectsRecipe.split(";");
+        int value;
 
         for (String rule : rules) {
             String[] parts = rule.split(":");
@@ -48,7 +50,16 @@ public class EffectFactory {
 
             String triggerEvent = parts[0].trim().toUpperCase(); // Ej: "ON_PLACED"
             String actionName = parts[1].trim().toUpperCase();   // Ej: "ENEMY_DAMAGE"
-            int value = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : 0; // Ej: 2
+            if ("HUNTER_MARK".equals(actionName)) {
+                int damage = Integer.parseInt(parts[2].trim());
+                int reward = Integer.parseInt(parts[3].trim());
+                Action markAction = new HunterMarkAction(Drive.of(damage), Drive.of(reward));
+                effects.add(new TriggeredEffect(triggerEvent, markAction));
+                continue; // Pasamos a la siguiente regla
+            } else {
+                value = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : 0; // Ej: 2
+            }
+
 
             // Buscamos la acción en el diccionario
             Function<Integer, Action> constructor = actionRegistry.get(actionName);

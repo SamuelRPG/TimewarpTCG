@@ -3,6 +3,7 @@ package com.saroga.timewarp.domain.model.effect.triggered;
 import com.saroga.timewarp.domain.model.effect.action.Action;
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.card.Card;
+import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
@@ -20,30 +21,37 @@ public class TriggeredEffect implements Effect {
     }
 
     @Override
-    public void onPlaced(Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {
+    public void onDestroyed(GameState game,Card card) {
+        if ("ON_DESTROYED".equals(triggerEvent)) {
+            action.execute(game,card, new ArrayList<>());
+        }
+    }
+
+    @Override
+    public void onPlaced(GameState game,Card card, PlayerState owner, PlayerState opponent, CardLocation lane, List<Card> targets) {
         if ("ON_PLACED".equals(triggerEvent)) {
-            action.execute(card, targets);
+            action.execute(game, card, targets);
         }
     }
 
     @Override
-    public void onDamageTaken(Card card, Drive drive) {
+    public void onDamageTaken(GameState game,Card card, Drive drive) {
         if ("ON_DAMAGE_TAKEN".equals(triggerEvent)) {
-            action.execute(card, new ArrayList<>()); // No necesita targets externos
+            action.execute(game, card, new ArrayList<>()); // No necesita targets externos
         }
     }
 
     @Override
-    public void onCombatWin(Card card, PlayerState owner, CardLocation lane) {
+    public void onCombatWin(GameState game,Card card, PlayerState owner, CardLocation lane) {
         if ("ON_COMBAT_WIN".equals(triggerEvent)) {
-            action.execute(card, new ArrayList<>());
+            action.execute(game, card, new ArrayList<>());
         }
     }
 
     @Override
-    public void onMovementConfirmed(Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {
+    public void onMovementConfirmed(GameState game,Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {
         if ("ON_MOVEMENT_CONFIRMED".equals(triggerEvent)) {
-            action.execute(card, new ArrayList<>());
+            action.execute(game, card, new ArrayList<>());
         }
     }
 

@@ -75,7 +75,7 @@ public class GameFlowService {
 
         for (Card card : actor.getPendingMoves()) {
             if (hasCardMovedThisRound(card)) {
-                card.onMovementConfirmed(actor, opponent, card.getCardLocation());
+                card.onMovementConfirmed(gameState, actor, opponent, card.getCardLocation());
                 card.setCardLocationAtBeginningOfRound(card.getCardLocation());
                 card.exhaust();
             }

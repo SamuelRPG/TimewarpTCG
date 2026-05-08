@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain.model.entity.playerState;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
+import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.vo.playerState.Resource;
@@ -83,8 +84,8 @@ public class PlayerState {
         fieldLeft.forEach(Card::ready);
     }
 
-    public void destroyCard(Card card) {
-        card.destroy();
+    public void destroyCard(GameState game, Card card) {
+        card.destroy(game);
         this.graveyard.add(card);
 
         switch (card.getCardLocation()) {

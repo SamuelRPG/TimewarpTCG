@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain.model.entity.card;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
+import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
@@ -72,29 +73,29 @@ public class Card {
         return this.cardType == CardType.SPELL;
     }
 
-    public void takeDamage(Drive amount) {
+    public void takeDamage(GameState game, Drive amount) {
         if (this.destroyed) return;
 
         this.drive = drive.decrease(amount);
 
         // Notificar a los efectos que hemos recibido daño (por si alguno salta)
-        effects.forEach(e -> e.onDamageTaken(this, amount));
+        effects.forEach(e -> e.onDamageTaken(game, this, amount));
 
         if (this.drive.isZero()) {
-            this.destroy();
+            this.destroy(game);
         }
     }
 
-    public void onPlaced(PlayerState player, PlayerState opponent, CardLocation location, List<Card> targets) {
-        effects.forEach(e -> e.onPlaced(this, player, opponent, location, targets));
+    public void onPlaced(GameState game, PlayerState player, PlayerState opponent, CardLocation location, List<Card> targets) {
+        effects.forEach(e -> e.onPlaced(game, this, player, opponent, location, targets));
     }
 
-    public void onCombatWin(PlayerState player, CardLocation lane) {
-        effects.forEach(e -> e.onCombatWin(this, player, lane));
+    public void onCombatWin(GameState game, PlayerState player, CardLocation lane) {
+        effects.forEach(e -> e.onCombatWin(game,this, player, lane));
     }
 
-    public Drive getEffectiveDrive() {
-        int bonus = effects.stream().mapToInt(e -> e.modifyDrive(this)).sum();
+    public Drive getEffectiveDrive(GameState game) {
+        int bonus = effects.stream().mapToInt(e -> e.modifyDrive(game,this)).sum();
         return Drive.of(this.drive.value() + bonus);
     }
 
@@ -104,27 +105,28 @@ public class Card {
         this.drive = drive.increase(amount);
     }
 
-    public void destroy() {
+    public void destroy(GameState game) {
         if (this.destroyed) return;
 
         this.drive = Drive.of(0);
         this.destroyed = true;
-        this.onDestroyed();
+        this.onDestroyed(game);
     }
 
-    public void onMovementConfirmed(PlayerState player, PlayerState opponent, CardLocation lane) {
-        effects.forEach(e -> e.onMovementConfirmed(this, player, opponent, lane));
+    public void onMovementConfirmed(GameState game,PlayerState player, PlayerState opponent, CardLocation lane) {
+        effects.forEach(e -> e.onMovementConfirmed(game, this, player, opponent, lane));
     }
 
-    public void beforeCombat() {
-        effects.forEach(e -> e.beforeCombat(this));
+    public void beforeCombat(GameState game) {
+        effects.forEach(e -> e.beforeCombat(game, this));
     }
 
     public void exhaust() { this.exhausted = true; }
 
     public void ready() {this.exhausted = false; }
 
-    public void onDestroyed() {
+    public void onDestroyed(GameState game) {
+        effects.forEach(e -> e.onDestroyed(game, this));
         System.out.println("Efectos que hace la carta al ser destruida");
     }
 
@@ -163,4 +165,5 @@ public class Card {
     public void setTargetingRequirements(List<TargetingRequirement> targetingRequirements) {this.targetingRequirements = targetingRequirements;}
     public SpellSpeed getSpellSpeed() {return spellSpeed;}
     public void setSpellSpeed(SpellSpeed spellSpeed) {this.spellSpeed = spellSpeed;}
+    public List<Effect> getEffects() {return effects;}
 }

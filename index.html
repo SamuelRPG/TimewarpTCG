@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Timewarp TCG - Panel de Pruebas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .panel {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        input,
+        select,
+        button {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .btn-blue {
+            background: #2196F3;
+        }
+
+        .btn-blue:hover {
+            background: #1976D2;
+        }
+
+        .btn-red {
+            background: #f44336;
+        }
+
+        .btn-red:hover {
+            background: #d32f2f;
+        }
+
+        .flex {
+            display: flex;
+            gap: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Timewarp TCG - Testing Client</h2>
+
+    <div class="flex">
+        <div style="flex: 1;">
+
+            <div class="panel">
+                <h3>1. Conexión</h3>
+                <button onclick="connect()">🔌 CONECTAR AL SERVIDOR</button>
+                <input type="text" id="playerId" value="11111111-1111-1111-1111-111111111111" disabled>
+                <input type="text" id="gameId" placeholder="Game ID (Se rellena solo)" disabled>
+            </div>
+
+            <div class="panel">
+                <h3>2. Controles de Turno</h3>
+                <button class="btn-blue" onclick="startMatch()">🎲 EMPEZAR PARTIDA LOCAL</button>
+                <button class="btn-red" onclick="passPriority()">⏭️ PASAR PRIORIDAD</button>
+            </div>
+
+            <div class="panel">
+                <h3>3. Jugar Carta (Mano -> Base/Pila)</h3>
+                <input type="text" id="playCardId" placeholder="Pega aquí el UUID de la carta de tu mano">
+                <select id="playDestination">
+                    <option value="MY_BASE">MY_BASE (Unidades)</option>
+                    <option value="FIELD_LEFT">FIELD_LEFT (Hechizos)</option>
+                    <option value="FIELD_RIGHT">FIELD_RIGHT (Hechizos)</option>
+                </select>
+                <input type="text" id="playTargets"
+                    placeholder="UUID del Target (Solo si es hechizo. Si no, déjalo vacío)">
+                <button onclick="playCard()">🃏 JUGAR CARTA</button>
+            </div>
+
+            <div class="panel">
+                <h3>4. Mover Carta (Base <-> Campos)</h3>
+                <input type="text" id="moveCardId" placeholder="Pega aquí el UUID de la carta en mesa">
+                <select id="moveDestination">
+                    <option value="FIELD_LEFT">FIELD_LEFT</option>
+                    <option value="FIELD_RIGHT">FIELD_RIGHT</option>
+                </select>
+                <button onclick="moveCard()">⚔️ MOVER CARTA</button>
+            </div>
+
+        </div>
+
+        <div style="flex: 2;">
+            <div class="panel" style="height: 90vh;">
+                <h3 style="margin-top:0;">Visión de Unity (JSON)</h3>
+                <p style="font-size: 12px; color: #666;">Busca aquí los IDs de tus cartas para copiarlos y pegarlos a la
+                    izquierda.</p>
+                <textarea id="consoleOutput"
+                    style="width: 100%; height: 90%; background: #1e1e1e; color: #00ff00; font-family: monospace; resize: none;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        const myPlayerId = document.getElementById('playerId').value;
+        let currentGameId = null;
+
+        function log(message) {
+            const out = document.getElementById('consoleOutput');
+            out.value = message + "\n\n" + out.value;
+        }
+
+        function connect() {
+            const socket = new WebSocket('ws://localhost:8080/timewarp-ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                log('✅ Conectado a Spring Boot!');
+
+                stompClient.subscribe('/topic/player/' + myPlayerId, function (message) {
+                    const gameState = JSON.parse(message.body);
+                    currentGameId = gameState.gameStateId;
+                    document.getElementById('gameId').value = currentGameId;
+                    log('====================================');
+                    log('ESTADO DEL JUEGO ACTUALIZADO:\n' + JSON.stringify(gameState, null, 2));
+
+                    stompClient.subscribe('/topic/game/' + currentGameId + '/player/' + myPlayerId, function (gameMsg) {
+                        log('====================================');
+                        log('ESTADO DEL JUEGO ACTUALIZADO:\n' + JSON.stringify(JSON.parse(gameMsg.body), null, 2));
+                    });
+                });
+                // Te suscribes a tu canal de ERRORES PRIVADOS
+                stompClient.subscribe('/topic/player/' + myPlayerId + '/errors', function (errorMsg) {
+                    const errorData = JSON.parse(errorMsg.body);
+
+                    // Aquí en Unity harías aparecer un texto flotante en rojo en la pantalla
+                    alert("❌ JUGADA ILEGAL: " + errorData.message);
+                });
+            }, function (error) { log('❌ Error: ' + error); });
+        }
+
+        function startMatch() {
+            if (!stompClient) return alert("Conéctate primero");
+            const request = { playerId: myPlayerId, deckName: "AGGRO" };
+            stompClient.send("/app/game/startLocalMatch", {}, JSON.stringify(request));
+        }
+
+        function passPriority() {
+            if (!currentGameId) return alert("Empieza partida primero");
+            const request = { gameId: currentGameId, playerId: myPlayerId };
+            stompClient.send("/app/game/passPriority", {}, JSON.stringify(request));
+        }
+
+        function playCard() {
+            if (!currentGameId) return alert("Empieza partida primero");
+            const cId = document.getElementById('playCardId').value.trim();
+            const dest = document.getElementById('playDestination').value;
+            const targetRaw = document.getElementById('playTargets').value.trim();
+
+            // Si hay target lo metemos en un array, si no, array vacío
+            const targetIds = targetRaw ? [targetRaw] : [];
+
+            const request = {
+                gameId: currentGameId,
+                playerId: myPlayerId,
+                cardId: cId,
+                destination: dest,
+                targetIds: targetIds
+            };
+            stompClient.send("/app/game/playCard", {}, JSON.stringify(request));
+            document.getElementById('playCardId').value = ''; // Limpiamos el input
+        }
+
+        function moveCard() {
+            if (!currentGameId) return alert("Empieza partida primero");
+            const cId = document.getElementById('moveCardId').value.trim();
+            const dest = document.getElementById('moveDestination').value;
+
+            const request = {
+                gameId: currentGameId,
+                playerId: myPlayerId,
+                cardId: cId,
+                destination: dest
+            };
+            stompClient.send("/app/game/moveCard", {}, JSON.stringify(request));
+            document.getElementById('moveCardId').value = ''; // Limpiamos el input
+        }
+    </script>
+</body>
+
+</html>

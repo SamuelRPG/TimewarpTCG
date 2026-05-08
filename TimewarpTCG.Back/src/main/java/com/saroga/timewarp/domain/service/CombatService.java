@@ -21,17 +21,17 @@ public class CombatService {
             throw new IllegalStateException("No hay unidades de ambos jugadores para provocar un combate");
         }
 
-        Drive totalDrivePA = calculateTotalDrive(pA, lane);
-        Drive totalDrivePB = calculateTotalDrive(pB, lane);
+        Drive totalDrivePA = calculateTotalDrive(gameState, pA, lane);
+        Drive totalDrivePB = calculateTotalDrive(gameState, pB, lane);
 
-        applyDamage(totalDrivePA, pB, lane);
-        applyDamage(totalDrivePB, pA, lane);
+        applyDamage(gameState, totalDrivePA, pB, lane);
+        applyDamage(gameState, totalDrivePB, pA, lane);
 
         if (totalDrivePA.value() == totalDrivePB.value()) {
             System.out.println("Empate");
         } else {
             PlayerState winner = determineWinner(pA, pB, totalDrivePA, totalDrivePB);
-            notifyVictory(winner, lane);
+            notifyVictory(gameState, winner, lane);
         }
     }
 
@@ -39,15 +39,15 @@ public class CombatService {
         return powerA.value() > powerB.value() ? pA : pB;
     }
 
-    private Drive calculateTotalDrive(PlayerState player, CardLocation location) {
+    private Drive calculateTotalDrive(GameState game,PlayerState player, CardLocation location) {
     int totalDrive = player.getUnitsIn(location).stream()
-                    .mapToInt( card -> card.getEffectiveDrive().value())
+                    .mapToInt( card -> card.getEffectiveDrive(game).value())
                     .sum();
 
     return Drive.of(totalDrive);
     }
 
-    private void applyDamage(Drive totalDrive, PlayerState targetedPlayer, CardLocation location) {
+    private void applyDamage(GameState game,Drive totalDrive, PlayerState targetedPlayer, CardLocation location) {
         List<Card> targets = new ArrayList<>(targetedPlayer.getUnitsIn(location));
 
         targets.sort(Comparator.comparingInt(c -> c.getDrive().value()));
@@ -58,10 +58,10 @@ public class CombatService {
 
             if (remainingDamage >= target.getDrive().value()) {
                 remainingDamage -= target.getDrive().value();
-                target.takeDamage(Drive.of(target.getDrive().value()));
-                targetedPlayer.destroyCard(target);
+                target.takeDamage(game, Drive.of(target.getDrive().value()));
+                targetedPlayer.destroyCard(game, target);
             } else {
-                target.takeDamage(Drive.of(remainingDamage));
+                target.takeDamage(game, Drive.of(remainingDamage));
                 remainingDamage = 0;
             }
         }
@@ -72,7 +72,7 @@ public class CombatService {
         return pA.hasUnitsIn(lane) && pB.hasUnitsIn(lane);
     }
 
-    private void notifyVictory(PlayerState winner, CardLocation lane) {
-        winner.getUnitsIn(lane).forEach(c -> c.onCombatWin(winner, lane));
+    private void notifyVictory(GameState game,PlayerState winner, CardLocation lane) {
+        winner.getUnitsIn(lane).forEach(c -> c.onCombatWin(game, winner, lane));
     }
 }

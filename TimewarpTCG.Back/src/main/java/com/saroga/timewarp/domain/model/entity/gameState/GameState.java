@@ -58,7 +58,7 @@ public class GameState {
             PlayerState owner = this.getPlayerById(spellCard.getOwnerId());
             PlayerState opponent = getOpponentOf(owner.getPlayerId());
 
-            spellCard.onPlaced(owner, opponent, spellCard.getCardLocation(), activeSpell.targets());
+            spellCard.onPlaced(this, owner, opponent, spellCard.getCardLocation(), activeSpell.targets());
 
             owner.getGraveyard().add(spellCard);
             spellCard.setCardLocation(CardLocation.GRAVEYARD);
