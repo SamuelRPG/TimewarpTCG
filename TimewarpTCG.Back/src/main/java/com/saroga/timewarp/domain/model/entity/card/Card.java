@@ -2,10 +2,7 @@ package com.saroga.timewarp.domain.model.entity.card;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
-import com.saroga.timewarp.domain.model.enums.CardLocation;
-import com.saroga.timewarp.domain.model.enums.CardType;
-import com.saroga.timewarp.domain.model.enums.Keyword;
-import com.saroga.timewarp.domain.model.enums.SpellSpeed;
+import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
@@ -31,9 +28,10 @@ public class Card {
 
     private List<Keyword> keywords;
     private List<Effect> effects;
+    private Faction faction;
 
     public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost,
-                CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed) {
+                CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed, Faction faction) {
         this.id = id;
         this.ownerId = ownerId; // para saber a que jugador pertenece la carta
         this.name = name;
@@ -49,20 +47,21 @@ public class Card {
         this.effects = effects != null ? new ArrayList<>(effects) : new ArrayList<>();
         this.targetingRequirements = targetingRequirements != null ? new ArrayList<>(targetingRequirements) : new ArrayList<>();
         this.spellSpeed = spellSpeed;
+        this.faction = faction;
     }
 
     public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost,
                                   List<Keyword> keywords, List<Effect> effects,
-                                  List<TargetingRequirement> targetingRequirements) {
+                                  List<TargetingRequirement> targetingRequirements, Faction faction) {
         return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost,
-                CardType.UNIT, keywords, effects, targetingRequirements, SpellSpeed.NOT_A_SPELL);
+                CardType.UNIT, keywords, effects, targetingRequirements, SpellSpeed.NOT_A_SPELL, faction );
     }
 
     public static Card createSpell(UUID ownerId, String name, Cost cost,
                                    List<Effect> effects,
-                                   List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed) {
+                                   List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed, Faction faction) {
         return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost,
-                CardType.SPELL, new ArrayList<>(), effects, targetingRequirements, spellSpeed);
+                CardType.SPELL, new ArrayList<>(), effects, targetingRequirements, spellSpeed, faction);
     }
 
     public boolean isUnit() {

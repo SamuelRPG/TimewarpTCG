@@ -149,12 +149,15 @@ public class TriggeredEffectsIntegrationTest {
         gameFlowService.confirmMoveAndPassPriority(game, playerBId, combatService);
 
         // 2. El Jugador A baja al Clérigo, TARGETEANDO AL OGRO (Trigger: ON_PLACED)
+        // 2. El Jugador A baja al Clérigo, TARGETEANDO AL OGRO (Trigger: ON_PLACED)
         cardPlayService.executePlay(game, playerAId, clericCard, CardLocation.MY_BASE, List.of(ogreCard));
 
         // ¡VERIFICACIÓN CRÍTICA DEL TRIGGER ON_PLACED!
-        // El Ogro tenía 5. El Clérigo daba +2 (ALLY_BOOST:2). Debería tener 7.
         assertEquals(7, ogreCard.getDrive().value(), "¡EL TRIGGER ON_PLACED FALLÓ! El Ogro debió recibir el buff del Clérigo");
         System.out.println("✅ Éxito: Trigger ON_PLACED -> " + ogreCard.getName() + " tiene ahora " + ogreCard.getDrive().value() + " de Drive.");
+
+        // ---> ¡AÑADE ESTA LÍNEA AQUÍ PARA QUE "B" TE DEVUELVA EL TURNO! <---
+        gameFlowService.confirmMoveAndPassPriority(game, playerBId, combatService);
 
         // 3. Movemos al Ogro a un Field para poder tirarle el hechizo
         ogreCard.ready();

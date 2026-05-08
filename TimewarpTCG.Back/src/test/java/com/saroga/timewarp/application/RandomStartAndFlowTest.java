@@ -102,7 +102,7 @@ public class RandomStartAndFlowTest {
 
         // A decide usar un hechizo RÁPIDO (Añadimos un hechizo falso a su mano para el test)
         // A decide usar un hechizo RÁPIDO (Añadimos un hechizo falso a su mano para el test)
-        Card fastSpell = Card.createSpell(humanId, "Rayo Test", Cost.of(1), new ArrayList<>(), new ArrayList<>(), SpellSpeed.FAST);
+        Card fastSpell = Card.createSpell(humanId, "Rayo Test", Cost.of(1), new ArrayList<>(), new ArrayList<>(), SpellSpeed.FAST, Faction.ANCIENT_EGYPT);
 
         // Lo añadimos a la lista de la mano
         game.getPlayerA().getHand().add(fastSpell);

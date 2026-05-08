@@ -50,16 +50,16 @@ public class GameFlowTest {
         });
 
         Card unitA = Card.createUnit(uuidA, "Guerrero Temporal", Drive.of(3), Cost.of(1),
-                new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+                new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), Faction.ANCIENT_EGYPT);
 
         Card unitB = Card.createUnit(uuidB, "Muro Defensivo", Drive.of(5), Cost.of(1),
-                new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+                new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), Faction.ANCIENT_EGYPT);
 
         Card fastSpell = Card.createSpell(uuidB, "Rayo Desintegrador", Cost.of(1),
-                dummyDamageEffect, fastSpellReqs, SpellSpeed.FAST);
+                dummyDamageEffect, fastSpellReqs, SpellSpeed.FAST, Faction.ANCIENT_EGYPT);
 
         Card instantSpell = Card.createSpell(uuidA, "Impulso Táctico", Cost.of(1),
-                dummyDamageEffect, instantSpellReqs, SpellSpeed.INSTANT);
+                dummyDamageEffect, instantSpellReqs, SpellSpeed.INSTANT, Faction.ANCIENT_EGYPT);
 
         List<Card> deckA = new ArrayList<>(List.of(unitA, instantSpell));
         List<Card> deckB = new ArrayList<>(List.of(unitB, fastSpell));

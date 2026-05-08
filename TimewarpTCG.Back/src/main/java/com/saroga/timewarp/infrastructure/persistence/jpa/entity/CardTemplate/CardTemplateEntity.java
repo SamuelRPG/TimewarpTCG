@@ -28,4 +28,5 @@ public class CardTemplateEntity {
     private String targetGroup;
     private String keywords;
     private String effects;
+    private String faction;
 }

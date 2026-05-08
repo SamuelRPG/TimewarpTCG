@@ -2,6 +2,7 @@ package com.saroga.timewarp.domain.model.entity.cardTemplate;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
 import com.saroga.timewarp.domain.model.enums.CardType;
+import com.saroga.timewarp.domain.model.enums.Faction;
 import com.saroga.timewarp.domain.model.enums.Keyword;
 import com.saroga.timewarp.domain.model.enums.SpellSpeed;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
@@ -23,4 +24,5 @@ public class CardTemplate {
     private List<TargetingRequirement> targetingRequirements;
     private List<Keyword> keywords;
     private List<Effect> effects;
+    private Faction faction;
 }

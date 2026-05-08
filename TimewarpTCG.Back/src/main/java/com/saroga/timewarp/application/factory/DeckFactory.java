@@ -2,6 +2,7 @@ package com.saroga.timewarp.application.factory;
 
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.deck.Deck;
+import com.saroga.timewarp.domain.model.enums.Faction;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 import com.saroga.timewarp.domain.model.enums.SpellSpeed;
@@ -19,13 +20,13 @@ public class DeckFactory {
         // Metemos 25 Guerreros Básicos
         for (int i = 0; i < 25; i++) {
             cards.add(Card.createUnit(ownerId, "Infantería Rápida", Drive.of(2), Cost.of(1),
-                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), Faction.ANCIENT_EGYPT));
         }
 
         // Metemos 15 Tanques
         for (int i = 0; i < 15; i++) {
             cards.add(Card.createUnit(ownerId, "Vanguardia Pesada", Drive.of(5), Cost.of(3),
-                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), Faction.ANCIENT_EGYPT));
         }
 
         return new Deck(cards);
@@ -38,13 +39,13 @@ public class DeckFactory {
         // 20 Muros Defensivos
         for (int i = 0; i < 20; i++) {
             cards.add(Card.createUnit(ownerId, "Muro de Energía", Drive.of(4), Cost.of(1),
-                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), Faction.ANCIENT_EGYPT));
         }
 
         // 20 Hechizos básicos (sin efectos reales aún para simplificar la creación)
         for (int i = 0; i < 20; i++) {
             cards.add(Card.createSpell(ownerId, "Chispa Temporal", Cost.of(1),
-                    new ArrayList<>(), new ArrayList<>(), SpellSpeed.FAST));
+                    new ArrayList<>(), new ArrayList<>(), SpellSpeed.FAST, Faction.ANCIENT_EGYPT));
         }
 
         return new Deck(cards);

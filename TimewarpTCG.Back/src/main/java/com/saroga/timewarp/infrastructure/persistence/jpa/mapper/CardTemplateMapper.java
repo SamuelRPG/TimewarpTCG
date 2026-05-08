@@ -2,10 +2,7 @@ package com.saroga.timewarp.infrastructure.persistence.jpa.mapper;
 
 import com.saroga.timewarp.application.factory.EffectFactory;
 import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
-import com.saroga.timewarp.domain.model.enums.CardType;
-import com.saroga.timewarp.domain.model.enums.Keyword;
-import com.saroga.timewarp.domain.model.enums.SpellSpeed;
-import com.saroga.timewarp.domain.model.enums.TargetGroup;
+import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
 import com.saroga.timewarp.domain.model.vo.card.Drive;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
@@ -37,7 +34,8 @@ public class CardTemplateMapper {
                 SpellSpeed.valueOf(entity.getSpellSpeed()),
                 mapTargeting(entity),
                 mapKeywords(entity.getKeywords()),
-                effectFactory.createEffects(entity.getEffects())
+                effectFactory.createEffects(entity.getEffects()),
+                Faction.valueOf(entity.getFaction())
         );
     }
 
