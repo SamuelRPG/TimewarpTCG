@@ -1,6 +1,7 @@
 package com.saroga.timewarp.infrastructure.persistence.jpa.mapper;
 
 import com.saroga.timewarp.application.factory.EffectFactory;
+import com.saroga.timewarp.application.factory.TargetingFactory;
 import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
 import com.saroga.timewarp.domain.model.enums.*;
 import com.saroga.timewarp.domain.model.vo.card.Cost;
@@ -18,9 +19,11 @@ import java.util.stream.Collectors;
 public class CardTemplateMapper {
 
     private final EffectFactory effectFactory;
+    private final TargetingFactory targetingFactory;
 
-    public CardTemplateMapper(EffectFactory effectFactory) {
+    public CardTemplateMapper(EffectFactory effectFactory, TargetingFactory targetingFactory) {
         this.effectFactory = effectFactory;
+        this.targetingFactory = targetingFactory;
     }
 
     public CardTemplate toDomain (CardTemplateEntity entity) {
@@ -32,22 +35,11 @@ public class CardTemplateMapper {
                 Cost.of(entity.getBaseCost()),
                 CardType.valueOf(entity.getCardType()),
                 SpellSpeed.valueOf(entity.getSpellSpeed()),
-                mapTargeting(entity),
+                targetingFactory.createTargeting(entity.getTargets()),
                 mapKeywords(entity.getKeywords()),
                 effectFactory.createEffects(entity.getEffects()),
                 Faction.valueOf(entity.getFaction())
         );
-    }
-
-    private List<TargetingRequirement> mapTargeting(CardTemplateEntity entity) {
-        List<TargetingRequirement> targets = new ArrayList<>();
-        if (entity.getTargetGroup() != null && !entity.getTargetGroup().equals("NONE")) {
-            targets.add(new TargetingRequirement(
-                    entity.getTargetCount(),
-                    TargetGroup.valueOf(entity.getTargetGroup())
-            ));
-        }
-        return targets;
     }
 
     private List<Keyword> mapKeywords(String keywordsStr) {

@@ -24,8 +24,7 @@ public class CardTemplateEntity {
     private int baseCost;
     private String cardType;
     private String spellSpeed;
-    private int targetCount;
-    private String targetGroup;
+    private String targets;
     private String keywords;
     private String effects;
     private String faction;

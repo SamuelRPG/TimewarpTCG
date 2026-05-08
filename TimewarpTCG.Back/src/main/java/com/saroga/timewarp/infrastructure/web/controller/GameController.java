@@ -15,6 +15,7 @@ import com.saroga.timewarp.infrastructure.web.dto.request.PassPriorityRequestDto
 import com.saroga.timewarp.infrastructure.web.dto.request.PlayCardRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.request.StartMatchRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.CardDto;
+import com.saroga.timewarp.infrastructure.web.dto.response.ErrorResponseDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.GameStateDto;
 import com.saroga.timewarp.infrastructure.web.mapper.CardMapper;
 import com.saroga.timewarp.infrastructure.web.mapper.GameStateMapper;
@@ -63,41 +64,53 @@ public class GameController {
 
     @MessageMapping("/playCard")
     public void playCard(@Payload PlayCardRequestDto request) {
-        GameState game = gameRepository.findById(request.gameId);
-        CardLocation destination = CardLocation.valueOf(request.destination);
+        try {
+            GameState game = gameRepository.findById(request.gameId);
+            CardLocation destination = CardLocation.valueOf(request.destination);
 
-        List<Card> targets = new ArrayList<>();
+            List<Card> targets = new ArrayList<>();
 
-        if (!request.targetIds.isEmpty()) {
-            targets = request.targetIds.stream()
-                    .map(c -> game.getCardById(c))
-                    .collect(Collectors.toList());
+            if (!request.targetIds.isEmpty()) {
+                targets = request.targetIds.stream()
+                        .map(c -> game.getCardById(c))
+                        .collect(Collectors.toList());
+            }
+            playCardUseCase.execute(game, request.playerId, request.cardId, destination, targets);
+            gameRepository.save(game);
+            checkBotTurn(game);
+            broadcastGame(game);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            sendErrorToPlayer(request.playerId, e.getMessage());
         }
-        playCardUseCase.execute(game, request.playerId, request.cardId, destination, targets);
-        gameRepository.save(game);
-        checkBotTurn(game);
-        broadcastGame(game);
     }
 
     @MessageMapping("/moveCard")
     public void moveCard(@Payload MoveCardRequestDto request) {
-        GameState game = gameRepository.findById(request.gameId);
-        CardLocation destination = CardLocation.valueOf(request.destination);
+        try {
+            GameState game = gameRepository.findById(request.gameId);
+            CardLocation destination = CardLocation.valueOf(request.destination);
 
-        moveCardUseCase.execute(game, request.playerId, request.cardId, destination);
-        gameRepository.save(game);
-        checkBotTurn(game);
-        broadcastGame(game);
+            moveCardUseCase.execute(game, request.playerId, request.cardId, destination);
+            gameRepository.save(game);
+            checkBotTurn(game);
+            broadcastGame(game);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            sendErrorToPlayer(request.playerId, e.getMessage());
+        }
     }
 
     @MessageMapping("/passPriority")
     public void passPriority(@Payload PassPriorityRequestDto request) {
-       GameState game = gameRepository.findById(request.gameId);
-       passPriorityUseCase.execute(game, request.playerId);
+        try {
+            GameState game = gameRepository.findById(request.gameId);
+            passPriorityUseCase.execute(game, request.playerId);
 
-       gameRepository.save(game);
-       checkBotTurn(game);
-       broadcastGame(game);
+            gameRepository.save(game);
+            checkBotTurn(game);
+            broadcastGame(game);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            sendErrorToPlayer(request.playerId, e.getMessage());
+        }
     }
 
     @MessageMapping("/startLocalMatch")
@@ -130,5 +143,11 @@ public class GameController {
         GameStateDto dto = GameStateMapper.toGameStateDto(game, playerId);
         String destination = String.format(PLAYER_TOPIC_TEMPLATE, game.getGameId(), playerId);
         simpMessagingTemplate.convertAndSend(destination, dto);
+    }
+
+    private void sendErrorToPlayer(UUID playerId, String errorMessage) {
+        ErrorResponseDto errorDto = new ErrorResponseDto(errorMessage);
+        String errorDestination = "/topic/player/" + playerId + "/errors";
+        simpMessagingTemplate.convertAndSend(errorDestination, errorDto);
     }
 }

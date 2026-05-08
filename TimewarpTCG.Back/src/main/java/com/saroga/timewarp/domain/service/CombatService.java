@@ -58,6 +58,7 @@ public class CombatService {
 
             if (remainingDamage >= target.getDrive().value()) {
                 remainingDamage -= target.getDrive().value();
+                target.takeDamage(Drive.of(target.getDrive().value()));
                 targetedPlayer.destroyCard(target);
             } else {
                 target.takeDamage(Drive.of(remainingDamage));

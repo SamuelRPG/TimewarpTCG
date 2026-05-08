@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain;
 
 import com.saroga.timewarp.application.factory.EffectFactory;
+import com.saroga.timewarp.application.factory.TargetingFactory;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
@@ -35,9 +36,10 @@ public class TriggeredEffectsIntegrationTest {
         gameFlowService = new GameFlowService();
         combatService = new CombatService();
 
-        // 2. Inicializamos la Infraestructura (Fábrica y Mapper)
+        // 2. Inicializamos la Infraestructura (Fábricas y Mapper)
         EffectFactory effectFactory = new EffectFactory();
-        mapper = new CardTemplateMapper(effectFactory);
+        TargetingFactory targetingFactory = new TargetingFactory(); // <-- NUESTRA NUEVA FÁBRICA
+        mapper = new CardTemplateMapper(effectFactory, targetingFactory); // <-- AHORA RECIBE DOS FÁBRICAS
     }
 
     @Test
@@ -57,23 +59,23 @@ public class TriggeredEffectsIntegrationTest {
         entityCleric.setBaseCost(1);
         entityCleric.setCardType("UNIT");
         entityCleric.setSpellSpeed("NOT_A_SPELL");
-        entityCleric.setTargetCount(1);
-        entityCleric.setTargetGroup("ALLY");
+        entityCleric.setTargets("1:ALLY"); // <-- NUEVO FORMATO DE TARGETS
         entityCleric.setKeywords("NONE");
-        entityCleric.setEffects("ON_PLACED:ALLY_BOOST:2"); // <-- EL EFECTO MÁGICO
+        entityCleric.setEffects("ON_PLACED:ALLY_BOOST:2");
+        entityCleric.setFaction("ANCIENT_EGYPT");
 
         // Carta 2: Un Ogro que al recibir daño se enfurece (+1 Drive)
         CardTemplateEntity entityOgre = new CardTemplateEntity();
         entityOgre.setId("UNIT_OGRE");
         entityOgre.setName("Ogro Furioso");
-        entityOgre.setBaseDrive(5); // Tiene mucha vida
+        entityOgre.setBaseDrive(5);
         entityOgre.setBaseCost(1);
         entityOgre.setCardType("UNIT");
         entityOgre.setSpellSpeed("NOT_A_SPELL");
-        entityOgre.setTargetCount(0);
-        entityOgre.setTargetGroup("NONE");
+        entityOgre.setTargets("NONE"); // <-- NUEVO FORMATO DE TARGETS
         entityOgre.setKeywords("NONE");
-        entityOgre.setEffects("ON_DAMAGE_TAKEN:SELF_BUFF:1"); // <-- EL EFECTO MÁGICO
+        entityOgre.setEffects("ON_DAMAGE_TAKEN:SELF_BUFF:1");
+        entityOgre.setFaction("ANCIENT_EGYPT");
 
         // Carta 3: Un hechizo rápido enemigo para pegarle al Ogro y probar su efecto
         CardTemplateEntity entitySpell = new CardTemplateEntity();
@@ -83,10 +85,10 @@ public class TriggeredEffectsIntegrationTest {
         entitySpell.setBaseCost(1);
         entitySpell.setCardType("SPELL");
         entitySpell.setSpellSpeed("FAST");
-        entitySpell.setTargetCount(1);
-        entitySpell.setTargetGroup("ENEMY");
+        entitySpell.setTargets("1:ENEMY"); // <-- NUEVO FORMATO DE TARGETS
         entitySpell.setKeywords("NONE");
         entitySpell.setEffects("ON_PLACED:ENEMY_DAMAGE:2");
+        entitySpell.setFaction("ANCIENT_EGYPT");
 
         // =====================================================================
         // FASE 2: EL MAPPER TRADUCE EL TEXTO A REGLAS DE JUEGO (PLANTILLAS)
@@ -95,27 +97,30 @@ public class TriggeredEffectsIntegrationTest {
         CardTemplate templateOgre = mapper.toDomain(entityOgre);
         CardTemplate templateSpell = mapper.toDomain(entitySpell);
 
-        // Verificamos que la fábrica hizo bien su trabajo y metió 1 efecto en cada plantilla
+        // Verificamos que las fábricas hicieron bien su trabajo
         assertEquals(1, templateCleric.getEffects().size(), "El Clérigo debería tener 1 efecto mapeado");
         assertEquals(1, templateOgre.getEffects().size(), "El Ogro debería tener 1 efecto mapeado");
+        assertEquals(1, templateCleric.getTargetingRequirements().size(), "El Clérigo debería pedir 1 objetivo aliado");
 
         // =====================================================================
         // FASE 3: CREAMOS CARTAS REALES (Simulando instantiateFromTemplate)
         // =====================================================================
+
+        // <-- AHORA PASAMOS EL ENUM DIRECTAMENTE, NADA DE STRINGS RAROS
         Card clericCard = new Card(UUID.randomUUID(), playerAId, templateCleric.getName(),
                 templateCleric.getBaseDrive(), templateCleric.getBaseDrive(), templateCleric.getBaseCost(),
-                CardType.valueOf(String.valueOf(templateCleric.getCardType())), templateCleric.getKeywords(),
-                templateCleric.getEffects(), templateCleric.getTargetingRequirements(), templateCleric.getSpellSpeed());
+                templateCleric.getCardType(), templateCleric.getKeywords(),
+                templateCleric.getEffects(), templateCleric.getTargetingRequirements(), templateCleric.getSpellSpeed(), templateCleric.getFaction());
 
         Card ogreCard = new Card(UUID.randomUUID(), playerAId, templateOgre.getName(),
                 templateOgre.getBaseDrive(), templateOgre.getBaseDrive(), templateOgre.getBaseCost(),
-                CardType.valueOf(String.valueOf(templateOgre.getCardType())), templateOgre.getKeywords(),
-                templateOgre.getEffects(), templateOgre.getTargetingRequirements(), templateOgre.getSpellSpeed());
+                templateOgre.getCardType(), templateOgre.getKeywords(),
+                templateOgre.getEffects(), templateOgre.getTargetingRequirements(), templateOgre.getSpellSpeed(), templateOgre.getFaction());
 
         Card spellCard = new Card(UUID.randomUUID(), playerBId, templateSpell.getName(),
                 templateSpell.getBaseDrive(), templateSpell.getBaseDrive(), templateSpell.getBaseCost(),
-                CardType.valueOf(String.valueOf(templateSpell.getCardType())), templateSpell.getKeywords(),
-                templateSpell.getEffects(), templateSpell.getTargetingRequirements(), templateSpell.getSpellSpeed());
+                templateSpell.getCardType(), templateSpell.getKeywords(),
+                templateSpell.getEffects(), templateSpell.getTargetingRequirements(), templateSpell.getSpellSpeed(), templateSpell.getFaction());
 
         // Ponemos todas las cartas en la mano para empezar a jugar
         clericCard.setCardLocation(CardLocation.HAND);
@@ -149,14 +154,13 @@ public class TriggeredEffectsIntegrationTest {
         gameFlowService.confirmMoveAndPassPriority(game, playerBId, combatService);
 
         // 2. El Jugador A baja al Clérigo, TARGETEANDO AL OGRO (Trigger: ON_PLACED)
-        // 2. El Jugador A baja al Clérigo, TARGETEANDO AL OGRO (Trigger: ON_PLACED)
         cardPlayService.executePlay(game, playerAId, clericCard, CardLocation.MY_BASE, List.of(ogreCard));
 
         // ¡VERIFICACIÓN CRÍTICA DEL TRIGGER ON_PLACED!
         assertEquals(7, ogreCard.getDrive().value(), "¡EL TRIGGER ON_PLACED FALLÓ! El Ogro debió recibir el buff del Clérigo");
         System.out.println("✅ Éxito: Trigger ON_PLACED -> " + ogreCard.getName() + " tiene ahora " + ogreCard.getDrive().value() + " de Drive.");
 
-        // ---> ¡AÑADE ESTA LÍNEA AQUÍ PARA QUE "B" TE DEVUELVA EL TURNO! <---
+        // ---> B devuelve el turno para que podamos mover
         gameFlowService.confirmMoveAndPassPriority(game, playerBId, combatService);
 
         // 3. Movemos al Ogro a un Field para poder tirarle el hechizo

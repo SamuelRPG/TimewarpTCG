@@ -40,5 +40,12 @@ public class TriggeredEffect implements Effect {
         }
     }
 
+    @Override
+    public void onMovementConfirmed(Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {
+        if ("ON_MOVEMENT_CONFIRMED".equals(triggerEvent)) {
+            action.execute(card, new ArrayList<>());
+        }
+    }
+
     // (Puedes añadir el resto de métodos de la interfaz Effect aquí de la misma forma)
 }
