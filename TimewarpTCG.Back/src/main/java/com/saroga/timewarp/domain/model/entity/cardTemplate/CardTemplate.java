@@ -25,4 +25,8 @@ public class CardTemplate {
     private List<Keyword> keywords;
     private List<Effect> effects;
     private Faction faction;
+
+    public Faction getFaction() {
+        return faction;
+    }
 }

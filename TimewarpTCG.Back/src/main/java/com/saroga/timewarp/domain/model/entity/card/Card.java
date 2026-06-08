@@ -1,6 +1,7 @@
 package com.saroga.timewarp.domain.model.entity.card;
 
 import com.saroga.timewarp.domain.model.effect.effectInterface.Effect;
+import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.*;
@@ -63,6 +64,33 @@ public class Card {
                                    List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed, Faction faction) {
         return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost,
                 CardType.SPELL, new ArrayList<>(), effects, targetingRequirements, spellSpeed, faction);
+    }
+
+    // Este es el "Clonador" que coge los datos de la BBDD (Plantilla) y crea la carta viva
+    public static Card fromTemplate(CardTemplate template, UUID ownerId) {
+        if (template.getCardType() == CardType.UNIT) {
+            return createUnit(
+                    ownerId,
+                    template.getName(),
+                    template.getBaseDrive(), // Ya es de tipo Drive
+                    template.getBaseCost(),  // Ya es de tipo Cost
+                    template.getKeywords(),
+                    template.getEffects(),
+                    template.getTargetingRequirements(),
+                    template.getFaction()
+            );
+        } else if (template.getCardType() == CardType.SPELL) {
+            return createSpell(
+                    ownerId,
+                    template.getName(),
+                    template.getBaseCost(),
+                    template.getEffects(),
+                    template.getTargetingRequirements(),
+                    template.getSpellSpeed(),
+                    template.getFaction()
+            );
+        }
+        throw new IllegalArgumentException("Tipo de carta no soportado: " + template.getCardType());
     }
 
     public boolean isUnit() {
@@ -166,4 +194,5 @@ public class Card {
     public SpellSpeed getSpellSpeed() {return spellSpeed;}
     public void setSpellSpeed(SpellSpeed spellSpeed) {this.spellSpeed = spellSpeed;}
     public List<Effect> getEffects() {return effects;}
+    public Faction getFaction() {return faction;}
 }
