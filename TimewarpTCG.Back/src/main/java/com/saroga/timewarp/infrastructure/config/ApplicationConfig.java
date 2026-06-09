@@ -5,6 +5,7 @@ import com.saroga.timewarp.application.ports.in.PlayerInGameActions.MoveCard.Mov
 import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PassPriority.PassPriorityUseCase;
 import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PlayCard.PlayCardUseCase;
 import com.saroga.timewarp.application.ports.in.StartMatch.StartMatchUseCase;
+import com.saroga.timewarp.application.ports.out.DeckRepository.DeckRepositoryPort; // <-- AÑADIDO
 import com.saroga.timewarp.application.service.BotBrain.BotBrainService;
 import com.saroga.timewarp.application.service.PlayerInGameActions.MoveCard.MoveCardService;
 import com.saroga.timewarp.application.service.PlayerInGameActions.PassPriority.PassPriorityService;
@@ -19,11 +20,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ApplicationConfig {
 
-    // Spring verá que StartMatchService necesita un DeckFactory.
-    // Como ya lo creamos en DomainConfig, Spring se lo pasará por parámetro mágicamente.
+    // <-- AHORA INYECTAMOS DeckRepositoryPort AQUÍ
     @Bean
-    public StartMatchUseCase startMatchUseCase(DeckFactory deckFactory) {
-        return new StartMatchService(deckFactory);
+    public StartMatchUseCase startMatchUseCase(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory) {
+        return new StartMatchService(deckRepositoryPort, deckFactory);
     }
 
     @Bean

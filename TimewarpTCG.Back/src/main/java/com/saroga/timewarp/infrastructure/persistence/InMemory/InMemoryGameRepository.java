@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 public class InMemoryGameRepository implements GameRepositoryPort {
+
     private final Map<UUID, GameState> storage = new ConcurrentHashMap<>();
 
     @Override
@@ -27,5 +28,11 @@ public class InMemoryGameRepository implements GameRepositoryPort {
             throw new IllegalStateException("No se encuentra el id de este game state");
         }
         return gameState;
+    }
+
+    // <-- AÑADIDO: Libera la memoria al instante
+    @Override
+    public void delete(UUID gameId) {
+        storage.remove(gameId);
     }
 }

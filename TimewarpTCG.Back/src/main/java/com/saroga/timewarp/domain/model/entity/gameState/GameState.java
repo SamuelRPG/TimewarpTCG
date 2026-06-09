@@ -33,7 +33,7 @@ public class GameState {
         this.gameId = id;
         this.playerA = playerA;
         this.playerB = playerB;
-        this.turnNumber = Turn.of(0);
+        this.turnNumber = Turn.of(1);
         this.activePlayerId = playerA.hasPriority() ? playerA.getPlayerId() : playerB.getPlayerId();
         this.gamePhase = GamePhase.MAIN_OPEN;
         this.consecutivePasses = ConsecutivePasses.ZERO;
@@ -275,4 +275,6 @@ public class GameState {
     public void setConsecutivePasses(ConsecutivePasses consecutivePasses) {
         this.consecutivePasses = consecutivePasses;
     }
+
+    public GameStatus getGameStatus() { return gameStatus;}
 }

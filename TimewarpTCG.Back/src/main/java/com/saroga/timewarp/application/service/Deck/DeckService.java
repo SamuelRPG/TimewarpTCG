@@ -1,78 +1,66 @@
 package com.saroga.timewarp.application.service.Deck;
 
-
-import com.saroga.timewarp.domain.model.enums.Faction;
-import com.saroga.timewarp.infrastructure.persistence.jpa.entity.CardTemplate.CardTemplateEntity;
-import com.saroga.timewarp.infrastructure.persistence.jpa.entity.Deck.DeckEntity;
-import com.saroga.timewarp.infrastructure.persistence.jpa.entity.DeckCard.DeckCardEntity;
-import com.saroga.timewarp.infrastructure.persistence.jpa.entity.User.UserEntity;
-import com.saroga.timewarp.infrastructure.persistence.jpa.repository.CardTemplateRepository;
-import com.saroga.timewarp.infrastructure.persistence.jpa.repository.DeckRepository;
-import com.saroga.timewarp.infrastructure.persistence.jpa.repository.UserRepository;
+import com.saroga.timewarp.application.ports.out.DeckRepository.DeckRepositoryPort;
+import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
+import com.saroga.timewarp.domain.model.entity.deck.Deck;
+import com.saroga.timewarp.domain.repository.cardCatalog.CardCatalogRepository;
+import com.saroga.timewarp.domain.service.DeckValidatorService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class DeckService {
 
-    private final DeckRepository deckRepository;
-    private final UserRepository userRepository;
-    private final CardTemplateRepository cardRepository;
+    private final DeckRepositoryPort deckRepositoryPort;
+    private final CardCatalogRepository cardCatalogRepository;
+    private final DeckValidatorService deckValidatorService;
 
-    public DeckService(DeckRepository deckRepository, UserRepository userRepository, CardTemplateRepository cardRepository) {
-        this.deckRepository = deckRepository;
-        this.userRepository = userRepository;
-        this.cardRepository = cardRepository;
+    // Solo inyectamos Puertos y Servicios de Dominio
+    public DeckService(DeckRepositoryPort deckRepositoryPort,
+                       CardCatalogRepository cardCatalogRepository,
+                       DeckValidatorService deckValidatorService) {
+        this.deckRepositoryPort = deckRepositoryPort;
+        this.cardCatalogRepository = cardCatalogRepository;
+        this.deckValidatorService = deckValidatorService;
     }
 
-    @Transactional
     public void saveCustomDeck(UUID userId, String deckName, Map<String, Integer> cardIdsAndQuantities) {
+        List<CardTemplate> flatCardList = new ArrayList<>();
 
-        // 1. Verificar Usuario
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-        DeckEntity newDeck = new DeckEntity();
-        newDeck.setName(deckName);
-        newDeck.setUser(user);
-
-        int totalCards = 0;
-
-        // 2. Extraer cartas y validar
+        // 1. Extraemos los objetos de Dominio a través del puerto del catálogo
         for (Map.Entry<String, Integer> entry : cardIdsAndQuantities.entrySet()) {
-            CardTemplateEntity cardInfo = cardRepository.findById(entry.getKey())
-                    .orElseThrow(() -> new IllegalArgumentException("Carta no existe en el catálogo: " + entry.getKey()));
-
+            String cardId = entry.getKey();
             int quantity = entry.getValue();
+
             if (quantity > 3) {
-                throw new IllegalArgumentException("No puedes tener más de 3 copias de la carta: " + cardInfo.getName());
+                throw new IllegalArgumentException("No puedes tener más de 3 copias de la carta: " + cardId);
             }
 
-            totalCards += quantity;
-            newDeck.addCard(new DeckCardEntity(cardInfo, quantity));
+            CardTemplate template = cardCatalogRepository.findById(cardId)
+                    .orElseThrow(() -> new IllegalArgumentException("Carta no existe en el catálogo: " + cardId));
+
+            for (int i = 0; i < quantity; i++) {
+                flatCardList.add(template);
+            }
         }
 
-        // 3. Regla 1: Tamaño del Mazo exacto (Ej: 40 cartas)
-        if (totalCards != 40) {
-            throw new IllegalArgumentException("El mazo debe tener exactamente 40 cartas. Tienes: " + totalCards);
-        }
+        // 2. Montamos el mazo y validamos las reglas de negocio (40 cartas, máx 2 facciones)
+        Deck newDeck = new Deck(flatCardList);
+        deckValidatorService.validate(newDeck);
 
-        // 4. Regla 2: Máximo 2 Facciones
-        Set<Faction> uniqueFactions = newDeck.getCards().stream()
-                .map(deckCard -> Faction.valueOf(deckCard.getCardTemplate().getFaction()))
-                .collect(Collectors.toSet());
+        // 3. Enviamos a guardar al puerto
+        deckRepositoryPort.saveDeck(userId, deckName, newDeck);
+    }
 
-        if (uniqueFactions.size() > 2) {
-            throw new IllegalArgumentException("Mazo inválido. Contiene " + uniqueFactions.size() +
-                    " facciones distintas. El límite es 2.");
-        }
+    public Deck getDomainDeck(UUID userId, String deckName) {
+        return deckRepositoryPort.getDeckByName(userId, deckName);
+    }
 
-        // 5. Guardar en Base de Datos Real
-        deckRepository.save(newDeck);
+    public List<String> getUserDeckNames(UUID userId) {
+        return deckRepositoryPort.getUserDeckNames(userId);
     }
 }

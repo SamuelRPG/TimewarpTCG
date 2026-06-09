@@ -2,6 +2,7 @@ package com.saroga.timewarp.application.service.StartMatch;
 
 import com.saroga.timewarp.application.factory.DeckFactory;
 import com.saroga.timewarp.application.ports.in.StartMatch.StartMatchUseCase;
+import com.saroga.timewarp.application.ports.out.DeckRepository.DeckRepositoryPort;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.deck.Deck;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
@@ -14,23 +15,33 @@ import java.util.stream.Collectors;
 
 public class StartMatchService implements StartMatchUseCase {
 
+    private final DeckRepositoryPort deckRepositoryPort;
     private final DeckFactory deckFactory;
 
-    public StartMatchService(DeckFactory deckFactory) {
+    // Inyectamos el puerto a BBDD y la fábrica (para el bot)
+    public StartMatchService(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory) {
+        this.deckRepositoryPort = deckRepositoryPort;
         this.deckFactory = deckFactory;
     }
 
     @Override
     public GameState executeLocalMatch(UUID playerId, String chosenDeckName) {
 
-        // 1. Obtenemos las "recetas" (Solo le pasamos el nombre del mazo, YA NO le pasamos el ID del jugador)
-        Deck playerDeck = deckFactory.getDeckByName(chosenDeckName);
-        Deck botDeck = deckFactory.getDeckByName("CONTROL");
+        Deck playerDeck;
 
+        // MEJORA: Si el frontend pide un mazo de prueba, usamos la fábrica simulada
+        if (chosenDeckName.equalsIgnoreCase("AGGRO") || chosenDeckName.equalsIgnoreCase("CONTROL")) {
+            playerDeck = deckFactory.getDeckByName(chosenDeckName);
+        } else {
+            // Si es un mazo personalizado, obligatoriamente lo buscamos en Supabase
+            playerDeck = deckRepositoryPort.getDeckByName(playerId, chosenDeckName);
+        }
+
+        // El bot sigue usando el mazo de fábrica "CONTROL"
+        Deck botDeck = deckFactory.getDeckByName("CONTROL");
         UUID botId = UUID.randomUUID();
 
         // 2. CONVERSIÓN: Leemos la receta y fabricamos las cartas vivas (List<Card>)
-        // Aquí SÍ usamos el playerId y botId, porque es cuando la carta "nace" y se le asigna su dueño
         List<Card> livePlayerCards = playerDeck.getTemplates().stream()
                 .map(template -> Card.fromTemplate(template, playerId))
                 .collect(Collectors.toList());

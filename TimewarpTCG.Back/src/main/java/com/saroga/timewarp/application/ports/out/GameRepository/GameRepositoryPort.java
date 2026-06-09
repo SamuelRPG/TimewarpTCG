@@ -7,4 +7,5 @@ import java.util.UUID;
 public interface GameRepositoryPort {
     void save (GameState gameState);
     GameState findById(UUID gameId);
+    void delete(UUID gameId);
 }

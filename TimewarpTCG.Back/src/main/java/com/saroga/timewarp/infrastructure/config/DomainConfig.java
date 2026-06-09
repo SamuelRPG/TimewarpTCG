@@ -3,6 +3,7 @@ package com.saroga.timewarp.infrastructure.config;
 import com.saroga.timewarp.application.factory.DeckFactory;
 import com.saroga.timewarp.domain.service.CardPlayService;
 import com.saroga.timewarp.domain.service.CombatService;
+import com.saroga.timewarp.domain.service.DeckValidatorService;
 import com.saroga.timewarp.domain.service.GameFlowService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +30,11 @@ public class DomainConfig {
     @Bean
     public DeckFactory deckFactory() {
         return new DeckFactory();
+    }
+
+    @Bean
+    public DeckValidatorService deckValidatorService() {
+        return new DeckValidatorService();
     }
 
 }
