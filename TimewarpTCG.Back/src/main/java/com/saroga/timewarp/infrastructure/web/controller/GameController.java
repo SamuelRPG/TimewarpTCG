@@ -60,13 +60,13 @@ public class GameController {
             GameState game = gameRepository.findById(request.gameId);
             CardLocation destination = CardLocation.valueOf(request.destination);
             List<Card> targets = new ArrayList<>();
-            if (!request.targetIds.isEmpty()) {
+            if (request.targetIds != null && !request.targetIds.isEmpty()) {
                 targets = request.targetIds.stream()
                         .map(c -> game.getCardById(c))
                         .collect(Collectors.toList());
             }
             playCardUseCase.execute(game, request.playerId, request.cardId, destination, targets);
-            processGameUpdate(game); // <-- USA EL HELPER
+            processGameUpdate(game);
         } catch (IllegalStateException | IllegalArgumentException e) {
             sendErrorToPlayer(request.playerId, e.getMessage());
         }

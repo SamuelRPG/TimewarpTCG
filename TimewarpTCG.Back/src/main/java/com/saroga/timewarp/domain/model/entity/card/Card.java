@@ -17,6 +17,7 @@ public class Card {
     private UUID id;
     private final UUID ownerId;
     private String name;
+    private String description;
     private Drive initialDrive;
     private Drive drive;
     private Cost cost;
@@ -32,16 +33,17 @@ public class Card {
     private List<Effect> effects;
     private Faction faction;
 
-    public Card(UUID id, UUID ownerId, String name, Drive initialDrive, Drive drive, Cost cost,
+    public Card(UUID id, UUID ownerId, String name, String description, Drive initialDrive, Drive drive, Cost cost,
                 CardType cardType, List<Keyword> keywords, List<Effect> effects, List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed, Faction faction) {
         this.id = id;
-        this.ownerId = ownerId; // para saber a que jugador pertenece la carta
+        this.ownerId = ownerId;
         this.name = name;
+        this.description = description; // <-- Guardamos la descripción
         this.initialDrive = initialDrive;
         this.drive = drive;
         this.cost = cost;
         this.cardType = cardType;
-        this.cardLocation = CardLocation.DECK; // la carta empieza en el mazo
+        this.cardLocation = CardLocation.DECK;
         this.exhausted = true;
         this.destroyed = false;
         this.cardLocationAtBeginningOfRound = CardLocation.DECK;
@@ -52,28 +54,31 @@ public class Card {
         this.faction = faction;
     }
 
-    public static Card createUnit(UUID ownerId, String name, Drive stats, Cost cost,
+    // 3. AÑADIDO en createUnit
+    public static Card createUnit(UUID ownerId, String name, String description, Drive stats, Cost cost,
                                   List<Keyword> keywords, List<Effect> effects,
                                   List<TargetingRequirement> targetingRequirements, Faction faction) {
-        return new Card(UUID.randomUUID(), ownerId, name, stats, stats, cost,
+        return new Card(UUID.randomUUID(), ownerId, name, description, stats, stats, cost,
                 CardType.UNIT, keywords, effects, targetingRequirements, SpellSpeed.NOT_A_SPELL, faction );
     }
 
-    public static Card createSpell(UUID ownerId, String name, Cost cost,
+    // 4. AÑADIDO en createSpell
+    public static Card createSpell(UUID ownerId, String name, String description, Cost cost,
                                    List<Effect> effects,
                                    List<TargetingRequirement> targetingRequirements, SpellSpeed spellSpeed, Faction faction) {
-        return new Card(UUID.randomUUID(), ownerId, name, Drive.of(0), Drive.of(0), cost,
+        return new Card(UUID.randomUUID(), ownerId, name, description, Drive.of(0), Drive.of(0), cost,
                 CardType.SPELL, new ArrayList<>(), effects, targetingRequirements, spellSpeed, faction);
     }
 
-    // Este es el "Clonador" que coge los datos de la BBDD (Plantilla) y crea la carta viva
+    // 5. AÑADIDO en fromTemplate (Extraemos la descripción de la base de datos)
     public static Card fromTemplate(CardTemplate template, UUID ownerId) {
         if (template.getCardType() == CardType.UNIT) {
             return createUnit(
                     ownerId,
                     template.getName(),
-                    template.getBaseDrive(), // Ya es de tipo Drive
-                    template.getBaseCost(),  // Ya es de tipo Cost
+                    template.getDescription(), // <-- Pasamos el texto
+                    template.getBaseDrive(),
+                    template.getBaseCost(),
                     template.getKeywords(),
                     template.getEffects(),
                     template.getTargetingRequirements(),
@@ -83,6 +88,7 @@ public class Card {
             return createSpell(
                     ownerId,
                     template.getName(),
+                    template.getDescription(), // <-- Pasamos el texto
                     template.getBaseCost(),
                     template.getEffects(),
                     template.getTargetingRequirements(),
@@ -195,4 +201,5 @@ public class Card {
     public void setSpellSpeed(SpellSpeed spellSpeed) {this.spellSpeed = spellSpeed;}
     public List<Effect> getEffects() {return effects;}
     public Faction getFaction() {return faction;}
+    public String getDescription() {return description;}
 }

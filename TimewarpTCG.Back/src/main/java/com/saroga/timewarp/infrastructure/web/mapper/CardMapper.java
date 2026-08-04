@@ -12,9 +12,15 @@ public class CardMapper {
         CardDto dto = new CardDto();
         dto.id = card.getId();
         dto.name = card.getName();
+        dto.description = card.getDescription();
+        dto.cardType = card.getCardType().name();
         dto.currentCost = card.getCost().value();
         dto.currentDrive = card.getDrive().value();
         dto.isExhausted = card.isExhausted();
+        dto.faction = card.getFaction().toString();
+        dto.targetingRequirements = card.getTargetingRequirements().stream()
+                .map(req -> req.toString()) // o req.toString(), dependiendo de cómo sea tu enum en Java
+                .toList();
         return dto;
     }
 

@@ -19,7 +19,7 @@ public class PlayerDto {
 
     // Listas visibles
     public List<CardDto> hand; // Será null para el enemigo
-    public List<CardDto> base;
+    public List<CardDto> baseZone;
     public List<CardDto> fieldLeft;
     public List<CardDto> fieldRight;
 }

@@ -16,7 +16,7 @@ public class PlayerMapper {
         dto.graveyardSize = player.getGraveyard().size();
         dto.handSize = player.getHand().size();
 
-        dto.base = CardMapper.toCardList(player.getBase());
+        dto.baseZone = CardMapper.toCardList(player.getBase());
         dto.fieldLeft = CardMapper.toCardList(player.getFieldLeft());
         dto.fieldRight = CardMapper.toCardList(player.getFieldRight());
 
