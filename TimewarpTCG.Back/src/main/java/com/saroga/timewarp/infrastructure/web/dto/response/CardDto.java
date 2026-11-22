@@ -13,4 +13,9 @@ public class CardDto {
     public boolean isExhausted;
     public String faction;
     public List<String> targetingRequirements;
+
+    // --- Campos añadidos para el cliente Unity (aditivos: el JSON anterior sigue siendo valido) ---
+    public List<String> keywords;                 // DISRUPTION, GLORY, JUMPER, CHARGE
+    public String spellSpeed;                     // NOT_A_SPELL, SLOW, FAST, INSTANT
+    public List<TargetReqDto> requirements;       // version estructurada de targetingRequirements
 }

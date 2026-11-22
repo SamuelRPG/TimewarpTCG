@@ -22,4 +22,7 @@ public class PlayerDto {
     public List<CardDto> baseZone;
     public List<CardDto> fieldLeft;
     public List<CardDto> fieldRight;
+
+    // Unidades movidas este turno que aun no se han confirmado (se confirman al pasar prioridad)
+    public List<UUID> pendingMoveIds;
 }

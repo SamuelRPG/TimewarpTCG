@@ -19,6 +19,7 @@ public class PlayerMapper {
         dto.baseZone = CardMapper.toCardList(player.getBase());
         dto.fieldLeft = CardMapper.toCardList(player.getFieldLeft());
         dto.fieldRight = CardMapper.toCardList(player.getFieldRight());
+        dto.pendingMoveIds = player.getPendingMoves().stream().map(c -> c.getId()).toList();
 
         if (isOwner) {
             dto.hand = CardMapper.toCardList(player.getHand());

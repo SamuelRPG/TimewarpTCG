@@ -277,4 +277,5 @@ public class GameState {
     }
 
     public GameStatus getGameStatus() { return gameStatus;}
+    public UUID getWinnerId() { return winnerId; }
 }
