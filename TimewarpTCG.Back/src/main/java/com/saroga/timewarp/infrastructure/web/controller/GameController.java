@@ -127,8 +127,9 @@ public class GameController {
     }
 
     private void checkBotTurn(GameState game) {
-        PlayerState activePlayer = game.getPlayerById(game.getActivePlayerId());
-        while (game.getPlayerById(game.getActivePlayerId()).isBot() && game.getGameStatus() != GameStatus.FINISHED) {
+        // Tope de seguridad: si el bot no avanza la partida jamas cuelga el servidor en un bucle infinito
+        int guard = 0;
+        while (game.getPlayerById(game.getActivePlayerId()).isBot() && game.getGameStatus() != GameStatus.FINISHED && guard++ < 500) {
             botBrainService.takeTurn(game);
             gameRepository.save(game);
         }

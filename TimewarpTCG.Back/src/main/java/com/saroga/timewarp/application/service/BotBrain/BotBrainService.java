@@ -7,6 +7,8 @@ import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.entity.playerState.PlayerState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
+import com.saroga.timewarp.domain.model.enums.GamePhase;
+import com.saroga.timewarp.domain.model.enums.SpellSpeed;
 import com.saroga.timewarp.domain.model.enums.TargetGroup;
 import com.saroga.timewarp.domain.model.vo.card.TargetingRequirement;
 import org.springframework.stereotype.Service;
@@ -28,12 +30,22 @@ public class BotBrainService {
     }
 
     public void takeTurn(GameState game) {
-        // 1. Obtenemos al Bot (Para el MVP asumimos que siempre es el Jugador B)
         PlayerState bot = game.getPlayerA().isBot() ? game.getPlayerA() : game.getPlayerB();
-        PlayerState human = bot.getPlayerId().equals(game.getPlayerA().getPlayerId()) ? game.getPlayerB() : game.getPlayerA();
 
         // Seguridad: Si no es el turno del bot o no tiene prioridad, ignoramos
         if (!bot.hasPriority()) return;
+
+        try {
+            decideAndAct(game, bot);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            // El bot NUNCA puede dejar la partida colgada: si su decision era ilegal, pasa prioridad.
+            System.out.println("[BOT] Accion no valida (" + e.getMessage() + "). Paso prioridad.");
+            passPriorityUseCase.execute(game, bot.getPlayerId());
+        }
+    }
+
+    private void decideAndAct(GameState game, PlayerState bot) {
+        PlayerState human = bot.getPlayerId().equals(game.getPlayerA().getPlayerId()) ? game.getPlayerB() : game.getPlayerA();
 
         if (!bot.getPendingMoves().isEmpty()) {
             passPriorityUseCase.execute(game, bot.getPlayerId());
@@ -70,7 +82,7 @@ public class BotBrainService {
             }
         }
 
-        Card spellToPlay = getPlayableSpell(bot);
+        Card spellToPlay = getPlayableSpell(game, bot);
         if (spellToPlay != null) {
             List<Card> targets = getBestTargetsForSpell(game, bot, spellToPlay);
 
@@ -85,7 +97,8 @@ public class BotBrainService {
 
         // --- REGLA 3: DESARROLLO (Bajar cartas) ---
         // Si no hay urgencias en el tablero, miro si tengo maná para bajar la carta más fuerte de mi mano
-        Card cardToPlay = getMostExpensivePlayableUnit(bot);
+        // Las unidades solo se pueden bajar en MAIN_OPEN (en COMBAT_* o MAIN_CLOSED el dominio lanza excepcion)
+        Card cardToPlay = game.getGamePhase() == GamePhase.MAIN_OPEN ? getMostExpensivePlayableUnit(bot) : null;
         if (cardToPlay != null && bot.getBase().size() < 6) { // Recordamos el límite de 6 unidades
             playCardUseCase.execute(game, bot.getPlayerId(), cardToPlay.getId(), CardLocation.MY_BASE, new ArrayList<>());
             return;
@@ -128,11 +141,12 @@ public class BotBrainService {
 
     // --- NUEVOS MÉTODOS "OJOS DEL BOT" ---
 
-    private Card getPlayableSpell(PlayerState bot) {
+    private Card getPlayableSpell(GameState game, PlayerState bot) {
         int currentMana = bot.getResource().value();
-        // Buscamos el primer hechizo que podamos pagar
+        // Buscamos el primer hechizo que podamos pagar (los SLOW solo se juegan en MAIN_OPEN)
         return bot.getHand().stream()
                 .filter(c -> c.isSpell() && c.getCost().value() <= currentMana)
+                .filter(c -> c.getSpellSpeed() != SpellSpeed.SLOW || game.getGamePhase() == GamePhase.MAIN_OPEN)
                 .findFirst()
                 .orElse(null);
     }
