@@ -34,7 +34,7 @@ Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jug
 ### Camino A (recomendado): con IntelliJ, que ya usas
 
 1. Abre en IntelliJ la carpeta **`TimewarpTCG.Back`** (*File ▸ Open*). Si pregunta por el proyecto Maven, acepta ("Trust" / "Load Maven project").
-2. **Java 21:** *File ▸ Project Structure ▸ Project ▸ SDK ▸ Add SDK ▸ Download JDK…* → versión **21**, vendor *Eclipse Temurin* → Download. Pon *Language level* a 21.
+2. **Java:** vale **Java 21 o superior (incluido el 25 que ya tienes)**. *File ▸ Project Structure ▸ Project ▸ SDK* → elige tu JDK 25 (o *Add SDK ▸ Download JDK…* si no aparece). Deja *Language level* en 21 (así lo pide el `pom.xml`).
 3. Abre `src/main/java/com/saroga/timewarp/TimewarpApplication.java` y pulsa el triángulo verde junto a `main` ▸ *Run*. Fallará por la base de datos: es normal, solo sirve para crear la configuración.
 4. *Run ▸ Edit Configurations…* ▸ selecciona **TimewarpApplication** ▸ *Modify options* ▸ marca **Add VM options** ▸ en el campo que aparece escribe exactamente:
 
@@ -45,12 +45,13 @@ Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jug
 
 ### Camino B: con la terminal
 
-Instala Java 21 y Maven (una vez) y **cierra y vuelve a abrir PowerShell**:
+Si ya tienes Java (21 o superior, p. ej. el 25), **solo te falta Maven**. Instálalo y **cierra y vuelve a abrir PowerShell**:
 
 ```powershell
-winget install EclipseAdoptium.Temurin.21.JDK
 winget install Apache.Maven
 ```
+
+Comprueba con `mvn -v`: debe mostrar la versión de Maven y `Java version: 25…`. Si dice que no encuentra Java, define `JAVA_HOME` con la carpeta de tu JDK (la que contiene `bin\java.exe`).
 
 Luego, en la carpeta `TimewarpTCG.Back`:
 
