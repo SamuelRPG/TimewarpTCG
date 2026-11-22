@@ -22,3 +22,19 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# --- Proyecto Unity (TimewarpTCG.Unity) ---
+# Se versionan Assets/, Packages/ y ProjectSettings/ (con sus .meta). Lo generado NO:
+TimewarpTCG.Unity/[Ll]ibrary/
+TimewarpTCG.Unity/[Tt]emp/
+TimewarpTCG.Unity/[Ll]ogs/
+TimewarpTCG.Unity/[Oo]bj/
+TimewarpTCG.Unity/[Bb]uild/
+TimewarpTCG.Unity/[Bb]uilds/
+TimewarpTCG.Unity/UserSettings/
+TimewarpTCG.Unity/.vs/
+TimewarpTCG.Unity/*.csproj
+TimewarpTCG.Unity/*.sln
+# Herramientas .NET
+[Bb]in/
+[Oo]bj/
