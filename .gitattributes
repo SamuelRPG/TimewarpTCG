@@ -1,0 +1,3 @@
+# El wrapper de Maven para Windows necesita finales de linea CRLF; el de Linux/Mac, LF
+*.cmd text eol=crlf
+mvnw text eol=lf

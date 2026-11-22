@@ -43,23 +43,20 @@ Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jug
    ```
 5. OK ▸ Run. Listo cuando la consola ponga `Started TimewarpApplication in … seconds`.
 
-### Camino B: con la terminal
+### Camino B: con la terminal (sin instalar Maven)
 
-Si ya tienes Java (21 o superior, p. ej. el 25), **solo te falta Maven**. Instálalo y **cierra y vuelve a abrir PowerShell**:
+El repo incluye el *Maven Wrapper* (`mvnw.cmd`): se descarga Maven él solo la primera vez. Solo necesitas **Java 21 o superior** (vale el 25). Comprueba con `java -version`.
 
-```powershell
-winget install Apache.Maven
-```
-
-Comprueba con `mvn -v`: debe mostrar la versión de Maven y `Java version: 25…`. Si dice que no encuentra Java, define `JAVA_HOME` con la carpeta de tu JDK (la que contiene `bin\java.exe`).
-
-Luego, en la carpeta `TimewarpTCG.Back`:
+En PowerShell, entra en la carpeta del backend y ejecuta:
 
 ```powershell
-mvn -Dmaven.test.skip=true spring-boot:run "-Dspring-boot.run.profiles=demo"
+cd C:\ruta\a\tu\repo\TimewarpTCG.Back
+.\mvnw.cmd -Dmaven.test.skip=true spring-boot:run "-Dspring-boot.run.profiles=demo"
 ```
 
-(Las comillas son necesarias en PowerShell.)
+La primera vez tarda unos minutos (descarga Maven y las librerías). Si dice que no encuentra Java, define `JAVA_HOME` con la carpeta de tu JDK (la que contiene `bin\java.exe`).
+
+> `winget install Apache.Maven` **no funciona**: Maven no está en el catálogo de winget. No lo necesitas gracias al wrapper.
 
 ### Comprobar que funciona
 
@@ -108,7 +105,7 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 |---|---|
 | Unity: "No se pudo conectar" | El backend no está arrancado o no usa el puerto 8080. |
 | El backend no arranca y menciona `HikariPool`, `Connection` o `postgresql` | Te falta el perfil `demo` (VM option `-Dspring.profiles.active=demo`). |
-| `mvn no se reconoce` | Usa el Camino A, o instala Maven (Camino B) y reabre PowerShell. |
+| `mvn no se reconoce` | No uses `mvn`: usa `.\\mvnw.cmd` (Camino B) o IntelliJ (Camino A). |
 | Unity: los clics no hacen nada (Unity 6) | *Edit ▸ Project Settings ▸ Player ▸ Other Settings ▸ Active Input Handling = **Both***, y reinicia Unity. |
 | Error de compilación con `ClientWebSocket` | Unity demasiado antiguo: usa 2021.3 LTS+ y *Api Compatibility Level = .NET Standard 2.1*. |
 | No aparece nada al pulsar Play | Busca en la consola líneas `[Timewarp]` y pásame el mensaje completo. |
