@@ -107,17 +107,17 @@ public class TriggeredEffectsIntegrationTest {
         // =====================================================================
 
         // <-- AHORA PASAMOS EL ENUM DIRECTAMENTE, NADA DE STRINGS RAROS
-        Card clericCard = new Card(UUID.randomUUID(), playerAId, templateCleric.getName(),
+        Card clericCard = new Card(UUID.randomUUID(), playerAId, templateCleric.getName(), templateCleric.getDescription(),
                 templateCleric.getBaseDrive(), templateCleric.getBaseDrive(), templateCleric.getBaseCost(),
                 templateCleric.getCardType(), templateCleric.getKeywords(),
                 templateCleric.getEffects(), templateCleric.getTargetingRequirements(), templateCleric.getSpellSpeed(), templateCleric.getFaction());
 
-        Card ogreCard = new Card(UUID.randomUUID(), playerAId, templateOgre.getName(),
+        Card ogreCard = new Card(UUID.randomUUID(), playerAId, templateOgre.getName(), templateOgre.getDescription(),
                 templateOgre.getBaseDrive(), templateOgre.getBaseDrive(), templateOgre.getBaseCost(),
                 templateOgre.getCardType(), templateOgre.getKeywords(),
                 templateOgre.getEffects(), templateOgre.getTargetingRequirements(), templateOgre.getSpellSpeed(), templateOgre.getFaction());
 
-        Card spellCard = new Card(UUID.randomUUID(), playerBId, templateSpell.getName(),
+        Card spellCard = new Card(UUID.randomUUID(), playerBId, templateSpell.getName(), templateSpell.getDescription(),
                 templateSpell.getBaseDrive(), templateSpell.getBaseDrive(), templateSpell.getBaseCost(),
                 templateSpell.getCardType(), templateSpell.getKeywords(),
                 templateSpell.getEffects(), templateSpell.getTargetingRequirements(), templateSpell.getSpellSpeed(), templateSpell.getFaction());

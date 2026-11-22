@@ -26,7 +26,7 @@ public class UserController {
 
     // 1. REGISTRO: Falla si el nombre ya existe
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestParam String username) {
+    public ResponseEntity<?> register(@RequestParam("username") String username) {
         if (userRepository.findByUsername(username).isPresent()) {
             return ResponseEntity.badRequest().body("{\"error\": \"El nombre de usuario ya está en uso.\"}");
         }
@@ -37,7 +37,7 @@ public class UserController {
 
     // 2. LOGIN: Falla si el nombre NO existe
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestParam String username) {
+    public ResponseEntity<?> login(@RequestParam("username") String username) {
         Optional<UserEntity> existingUser = userRepository.findByUsername(username);
 
         if (existingUser.isPresent()) {
@@ -50,7 +50,7 @@ public class UserController {
     // 3. ELIMINAR CUENTA: Borra los mazos y luego el usuario
     @DeleteMapping("/{userId}")
     @Transactional // Esto asegura que si algo falla a medias, no se borra nada (Todo o nada)
-    public ResponseEntity<?> deleteAccount(@PathVariable UUID userId) {
+    public ResponseEntity<?> deleteAccount(@PathVariable("userId") UUID userId) {
         if (!userRepository.existsById(userId)) {
             return ResponseEntity.status(404).body("{\"error\": \"Usuario no encontrado.\"}");
         }
