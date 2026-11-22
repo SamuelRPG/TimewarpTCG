@@ -51,8 +51,10 @@ En PowerShell, entra en la carpeta del backend y ejecuta:
 
 ```powershell
 cd C:\ruta\a\tu\repo\TimewarpTCG.Back
-.\mvnw.cmd -Dmaven.test.skip=true spring-boot:run "-Dspring-boot.run.profiles=demo"
+.\mvnw.cmd "-Dmaven.test.skip=true" spring-boot:run "-Dspring-boot.run.profiles=demo"
 ```
+
+**En PowerShell los `-D…` deben ir entre comillas** (si no, parte `-Dmaven.test.skip=true` por el punto y da `Unknown lifecycle phase ".test.skip=true"`). Los avisos `WARNING: … Unsafe` / `native access` del principio son normales.
 
 La primera vez tarda unos minutos (descarga Maven y las librerías). Si dice que no encuentra Java, define `JAVA_HOME` con la carpeta de tu JDK (la que contiene `bin\java.exe`).
 
