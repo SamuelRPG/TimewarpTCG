@@ -58,6 +58,8 @@ cd C:\ruta\a\tu\repo\TimewarpTCG.Back
 
 La primera vez tarda unos minutos (descarga Maven y las librerías). Si dice que no encuentra Java, define `JAVA_HOME` con la carpeta de tu JDK (la que contiene `bin\java.exe`).
 
+**Atajo:** haz doble clic en `arrancar-backend.cmd` (en la raíz del repo): ejecuta ese mismo comando por ti. Para parar el servidor pulsa **Ctrl+C** en la ventana (y confirma con `S`). Hay que arrancarlo cada vez que quieras jugar; no se queda en marcha solo.
+
 > `winget install Apache.Maven` **no funciona**: Maven no está en el catálogo de winget. No lo necesitas gracias al wrapper.
 
 ### Comprobar que funciona
