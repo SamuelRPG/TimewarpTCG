@@ -11,7 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="../../Unity/Assets/Timewarp/Scripts/Net/*.cs" />
-    <Compile Include="../../Unity/Assets/Timewarp/Scripts/Model/*.cs" />
+    <Compile Include="../../TimewarpTCG.Unity/Assets/Timewarp/Scripts/Net/*.cs" />
+    <Compile Include="../../TimewarpTCG.Unity/Assets/Timewarp/Scripts/Model/*.cs" />
   </ItemGroup>
 </Project>

@@ -10,7 +10,7 @@ que las pistas del cliente coincidan con las validaciones del servidor y que el 
 de la lógica del cliente (fin de partida, parseo de objetivos, registro de partida) que no necesitan servidor.
 
 ```bash
-cd Tools/ClientSmokeTest
+cd tools/ClientSmokeTest
 dotnet run -c Release -- localhost:8080 AGGRO 10        # host  mazo  nº de partidas
 dotnet run -c Release -- localhost:8080 CONTROL 3 v     # "v" = imprime el registro de cada jugada
 ```
@@ -24,5 +24,5 @@ Veinte líneas que muestran el protocolo STOMP “en crudo” (conectar, suscrib
 
 ```bash
 pip install websockets
-python3 Tools/python/stomp_probe.py AGGRO
+python3 tools/python/stomp_probe.py AGGRO
 ```
