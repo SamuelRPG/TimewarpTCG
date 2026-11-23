@@ -38,7 +38,7 @@ namespace TimewarpTCG
 
         // ------------------------------------------------------------------ conexión
 
-        public async Task ConnectAsync(string wsUrl, int timeoutMs = 5000)
+        public async Task ConnectAsync(string wsUrl, string token, int timeoutMs = 5000)
         {
             _closedRaised = false;
             _cts = new CancellationTokenSource();
@@ -56,7 +56,7 @@ namespace TimewarpTCG
 
             _ = Task.Run(ReceiveLoop);
 
-            await SendRaw("CONNECT\naccept-version:1.2\nhost:" + uri.Host + "\nheart-beat:0,0\n\n\0");
+            await SendRaw("CONNECT\naccept-version:1.2\nhost:" + uri.Host + "\nheart-beat:0,0\nAuthorization:Bearer " + token + "\n\n\0");
 
             var winner = await Task.WhenAny(_connected.Task, Task.Delay(timeoutMs));
             if (winner != _connected.Task) throw new Exception("El servidor no respondió al CONNECT de STOMP.");

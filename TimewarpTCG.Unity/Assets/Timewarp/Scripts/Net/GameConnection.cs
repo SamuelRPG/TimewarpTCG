@@ -28,13 +28,15 @@ namespace TimewarpTCG
             host = (host ?? "").Trim();
             if (host.Length == 0) host = "localhost:8080";
             if (host.StartsWith("ws://") || host.StartsWith("wss://")) return host.Contains("/timewarp-ws") ? host : host.TrimEnd('/') + "/timewarp-ws";
+            bool secure = host.StartsWith("https://");   // https:// => wss:// (cifrado). Nunca degradar a ws:// si el usuario pidió https
             host = host.Replace("http://", "").Replace("https://", "").TrimEnd('/');
             int slash = host.IndexOf('/');
             if (slash >= 0) host = host.Substring(0, slash);
-            return "ws://" + host + "/timewarp-ws";
+            return (secure ? "wss://" : "ws://") + host + "/timewarp-ws";
         }
 
-        public async Task ConnectAsync(string host, string playerId)
+        /// <param name="token">JWT que dio el servidor al iniciar sesión / entrar como invitado. El servidor lo exige en el CONNECT.</param>
+        public async Task ConnectAsync(string host, string playerId, string token)
         {
             PlayerId = playerId;
             GameId = null;
@@ -42,7 +44,7 @@ namespace TimewarpTCG
             _stomp.Log += s => { var l = Log; if (l != null) l(s); };
             _stomp.Closed += r => { var d = Disconnected; if (d != null) d(r); };
 
-            await _stomp.ConnectAsync(ToWebSocketUrl(host));
+            await _stomp.ConnectAsync(ToWebSocketUrl(host), token);
             // IMPORTANTE: suscribirse ANTES de pedir la partida, o se pierde el primer estado.
             await _stomp.SubscribeAsync("/topic/player/" + playerId, OnStateJson);
             await _stomp.SubscribeAsync("/topic/player/" + playerId + "/errors", OnErrorJson);

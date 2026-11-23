@@ -37,7 +37,7 @@ namespace TimewarpTCG
         float _connectDeadline;
 
         // sesión (cuenta) y datos de la base de datos
-        string _userId, _username, _sessionHost;
+        string _userId, _username, _token, _sessionHost;
         List<DeckDto> _decks = new List<DeckDto>();
 
         // ------------------------------------------------------------ inicio
@@ -73,7 +73,8 @@ namespace TimewarpTCG
                 }
                 _help = new HelpView(_canvas.transform);
 
-                _menu.OnLogin = name => { var _ = LoginAsync(name, true); };
+                _menu.OnLogin = (name, pass) => { var _ = LoginAsync(name, pass, false); };
+                _menu.OnRegister = (name, pass) => { var _ = LoginAsync(name, pass, true); };
                 _menu.OnEditDecks = () => { var _ = EditDecksAsync(); };
                 _menu.OnPlay = OnPlayClicked;
                 _menu.OnHelp = () => _help.Show(true);
@@ -168,38 +169,48 @@ namespace TimewarpTCG
         }
 
         // ------------------------------------------------------------ cuenta y mazos
-        bool HasSession(string host) { return _userId != null && _sessionHost == host && _username == _menu.Username; }
+        bool HasSession(string host) { return _userId != null && _token != null && _sessionHost == host; }
 
-        /// <summary>Entra (o se registra) con el nombre escrito y carga sus mazos guardados. Devuelve true si hay sesión.</summary>
-        async System.Threading.Tasks.Task<bool> LoginAsync(string name, bool announce)
+        void Logout()
+        {
+            _userId = null; _username = null; _token = null; _sessionHost = null;
+            RestApi.Token = null;
+            _decks = new List<DeckDto>();
+            _menu.SetSession(null);
+            _menu.SetDecks(_decks);
+        }
+
+        /// <summary>Entra (o crea la cuenta) con nombre y contraseña y carga sus mazos guardados. Devuelve true si hay sesión.</summary>
+        async System.Threading.Tasks.Task<bool> LoginAsync(string name, string password, bool register)
         {
             string host = _menu.Host;
             if (string.IsNullOrWhiteSpace(name))
             {
-                _userId = null; _username = null; _decks = new List<DeckDto>();
-                _menu.SetSession(null); _menu.SetDecks(_decks);
-                if (announce) _menu.SetStatus("Escribe un nombre para entrar. Sin nombre juegas como invitado (solo mazos AGGRO / CONTROL).", false);
+                Logout();
+                _menu.SetStatus("Escribe un nombre y una contraseña. Sin nombre juegas como invitado (solo mazos AGGRO / CONTROL).", true);
                 return false;
             }
             _menu.SetBusy(true);
-            if (announce) _menu.SetStatus("Entrando como «" + name.Trim() + "»…", false);
+            _menu.SetStatus((register ? "Creando la cuenta «" : "Entrando como «") + name.Trim() + "»…", false);
             try
             {
-                var u = await RestApi.LoginOrRegisterAsync(host, name.Trim());
-                _userId = u.id; _username = u.username; _sessionHost = host;
-                _decks = await RestApi.GetDecksAsync(host, u.id);
+                UserDto u = register ? await RestApi.RegisterAsync(host, name.Trim(), password)
+                                     : await RestApi.LoginAsync(host, name.Trim(), password);
+                _userId = u.id; _username = u.username; _token = u.token; _sessionHost = host;
+                RestApi.Token = u.token;
+                _decks = await RestApi.GetDecksAsync(host);
                 _menu.SetSession(u.username);
                 _menu.SetDecks(_decks);
+                _menu.ClearPassword();                 // la contraseña no se guarda en ninguna parte
                 _menu.Remember();
-                if (announce) _menu.SetStatus("Sesión iniciada. Tienes " + _decks.Count + " mazo(s) guardado(s).", false);
+                _menu.SetStatus((register ? "Cuenta creada. " : "Sesión iniciada. ") + "Tienes " + _decks.Count + " mazo(s) guardado(s).", false);
                 _menu.SetBusy(false);
                 return true;
             }
             catch (Exception e)
             {
-                _userId = null; _username = null;
-                _menu.SetSession(null);
-                _menu.SetStatus("No se pudo iniciar sesión: " + e.Message, true);
+                Logout();
+                _menu.SetStatus((register ? "No se pudo crear la cuenta: " : "No se pudo iniciar sesión: ") + e.Message, true);
                 _menu.SetBusy(false);
                 return false;
             }
@@ -212,18 +223,15 @@ namespace TimewarpTCG
             if (_builder == null) { _menu.SetStatus("El editor de mazos no está disponible (mira la consola de Unity).", true); return; }
             if (!HasSession(host))
             {
-                if (!await LoginAsync(_menu.Username, false))
-                {
-                    if (string.IsNullOrWhiteSpace(_menu.Username)) _menu.SetStatus("Para crear mazos escribe tu nombre arriba y pulsa ENTRAR.", true);
-                    return;
-                }
+                _menu.SetStatus("Para crear mazos escribe tu nombre y contraseña y pulsa ENTRAR (o CREAR CUENTA si es tu primera vez).", true);
+                return;
             }
             _menu.SetBusy(true);
             _menu.SetStatus("Cargando el catálogo de cartas…", false);
             try
             {
                 var catalog = await RestApi.GetCardsAsync(host);
-                _decks = await RestApi.GetDecksAsync(host, _userId);
+                _decks = await RestApi.GetDecksAsync(host);
                 _menu.SetStatus("", false);
                 _menu.SetBusy(false);
                 _menu.Show(false);
@@ -232,6 +240,7 @@ namespace TimewarpTCG
             catch (Exception e)
             {
                 _menu.SetBusy(false);
+                if (e.Message.Contains("caducada")) Logout();       // el token ha caducado: hay que volver a entrar
                 _menu.SetStatus("No se pudo cargar el catálogo: " + e.Message, true);
             }
         }
@@ -244,11 +253,9 @@ namespace TimewarpTCG
             string deck = _menu.SelectedDeck;
             string botDeck = _menu.BotDeck;
 
-            // si has escrito un nombre y aún no hay sesión, entramos; los mazos propios exigen sesión
-            if (_menu.Username.Length > 0 && !HasSession(host)) await LoginAsync(_menu.Username, false);
             if (!_menu.IsBuiltinDeck && !HasSession(host))
             {
-                _menu.SetStatus("Para jugar con «" + deck + "» necesitas iniciar sesión con tu nombre (pulsa ENTRAR).", true);
+                _menu.SetStatus("Para jugar con «" + deck + "» inicia sesión (nombre + contraseña y ENTRAR).", true);
                 return;
             }
 
@@ -256,10 +263,14 @@ namespace TimewarpTCG
             _menu.SetStatus("Conectando con " + host + "…", false);
             _screen = AppScreen.Connecting;
             _connectDeadline = Time.unscaledTime + 30f;
-            string playerId = HasSession(host) ? _userId : MenuView.GuestId();
 
             try
             {
+                // identidad: tu cuenta si has iniciado sesión; si no, un invitado que emite el servidor (token firmado)
+                string playerId, token;
+                if (HasSession(host)) { playerId = _userId; token = _token; }
+                else { var g = await RestApi.GuestAsync(host); playerId = g.id; token = g.token; }
+
                 CloseConnection();
                 _conn = new GameConnection();
                 _conn.StateReceived += OnState;
@@ -268,7 +279,7 @@ namespace TimewarpTCG
                 _conn.Log += m => Debug.Log("[Timewarp] " + m);
                 _game.Conn = _conn;
 
-                await _conn.ConnectAsync(host, playerId);
+                await _conn.ConnectAsync(host, playerId, token);
                 _deckInUse = deck; _botDeckInUse = botDeck;
                 _menu.SetStatus("Creando partida…", false);
                 _connectDeadline = Time.unscaledTime + 12f;

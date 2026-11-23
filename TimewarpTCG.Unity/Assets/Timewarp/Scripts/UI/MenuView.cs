@@ -11,10 +11,11 @@ namespace TimewarpTCG
     {
         public RectTransform Root;
         public Action OnPlay, OnHelp, OnEditDecks;
-        public Action<string> OnLogin;
+        public Action<string, string> OnLogin;       // (nombre, contraseña)
+        public Action<string, string> OnRegister;
 
-        readonly InputField _host, _user;
-        readonly Button _play, _login, _edit;
+        readonly InputField _host, _user, _pass;
+        readonly Button _play, _login, _register, _edit;
         readonly Text _status, _session;
         readonly RectTransform _deckList;
         readonly Dictionary<string, Button> _botBtns = new Dictionary<string, Button>();
@@ -22,21 +23,15 @@ namespace TimewarpTCG
         string _botDeck = "RANDOM";
         List<DeckDto> _decks = new List<DeckDto>();
 
-        const string KHost = "tw_host", KUser = "tw_user", KDeck = "tw_deck", KGuest = "tw_guest", KBot = "tw_bot";
+        const string KHost = "tw_host", KUser = "tw_user", KDeck = "tw_deck", KBot = "tw_bot";
 
         public string Host { get { return string.IsNullOrWhiteSpace(_host.text) ? "localhost:8080" : _host.text.Trim(); } }
         public string Username { get { return _user.text == null ? "" : _user.text.Trim(); } }
+        public string Password { get { return _pass.text ?? ""; } }
+        public void ClearPassword() { _pass.text = ""; }
         public string SelectedDeck { get { return _selectedDeck; } }
         public string BotDeck { get { return _botDeck; } }
         public bool IsBuiltinDeck { get { return _selectedDeck == "AGGRO" || _selectedDeck == "CONTROL"; } }
-
-        /// <summary>Identificador estable de "invitado" (el backend acepta cualquier UUID para los mazos de prueba).</summary>
-        public static string GuestId()
-        {
-            string id = PlayerPrefs.GetString(KGuest, "");
-            if (string.IsNullOrEmpty(id)) { id = Guid.NewGuid().ToString(); PlayerPrefs.SetString(KGuest, id); PlayerPrefs.Save(); }
-            return id;
-        }
 
         public MenuView(Transform canvas)
         {
@@ -57,27 +52,35 @@ namespace TimewarpTCG
             _host = UiKit.MakeInput(panel.transform, "localhost:8080", PlayerPrefs.GetString(KHost, "localhost:8080"), 22);
             UiKit.Place(_host.GetComponent<RectTransform>(), 0.5f, 1, -260, -162, 440, 48);
 
-            Caption(panel.transform, "Cuenta: tu nombre (vacío = invitado)", -134, 220);
+            Caption(panel.transform, "Cuenta: nombre (vacío = invitado)", -134, 130);
             _user = UiKit.MakeInput(panel.transform, "invitado", PlayerPrefs.GetString(KUser, ""), 22);
-            UiKit.Place(_user.GetComponent<RectTransform>(), 0.5f, 1, 165, -162, 330, 48);
-            _login = UiKit.MakeButton(panel.transform, "ENTRAR", UiKit.Blue, () => { if (OnLogin != null) OnLogin(Username); }, 20);
-            UiKit.Place(_login.GetComponent<RectTransform>(), 0.5f, 1, 405, -162, 130, 48);
+            UiKit.Place(_user.GetComponent<RectTransform>(), 0.5f, 1, 120, -162, 240, 48);
 
-            _session = UiKit.Label(panel.transform, "", 16, UiKit.Muted, TextAnchor.MiddleRight);
-            UiKit.Place(_session.rectTransform, 0.5f, 1, 130, -214, 760, 24);
+            Caption(panel.transform, "Contraseña (mín. 8 caracteres)", -134, 370);
+            _pass = UiKit.MakeInput(panel.transform, "contraseña", "", 22);
+            _pass.contentType = InputField.ContentType.Password;       // se muestra como ••••, y nunca se guarda en PlayerPrefs
+            _pass.ForceLabelUpdate();
+            UiKit.Place(_pass.GetComponent<RectTransform>(), 0.5f, 1, 370, -162, 220, 48);
+
+            _session = UiKit.Label(panel.transform, "", 16, UiKit.Muted, TextAnchor.MiddleLeft);
+            UiKit.Place(_session.rectTransform, 0.5f, 1, -230, -222, 500, 44);
+            _login = UiKit.MakeButton(panel.transform, "ENTRAR", UiKit.Blue, () => { if (OnLogin != null) OnLogin(Username, Password); }, 20);
+            UiKit.Place(_login.GetComponent<RectTransform>(), 0.5f, 1, 300, -222, 170, 44);
+            _register = UiKit.MakeButton(panel.transform, "CREAR CUENTA", UiKit.PanelLight, () => { if (OnRegister != null) OnRegister(Username, Password); }, 18);
+            UiKit.Place(_register.GetComponent<RectTransform>(), 0.5f, 1, 450, -222, 180, 44);
 
             // ---- tu mazo
             var deckLabel = UiKit.Label(panel.transform, "TU MAZO", 18, UiKit.Muted, TextAnchor.LowerLeft, FontStyle.Bold);
-            UiKit.Place(deckLabel.rectTransform, 0.5f, 1, -450, -246, 400, 26);
+            UiKit.Place(deckLabel.rectTransform, 0.5f, 1, -450, -276, 400, 26);
             RectTransform content;
             var scroll = UiKit.MakeScroll(panel.transform, new Color32(12, 15, 26, 255), out content, "DeckScroll");
-            UiKit.Place(scroll.GetComponent<RectTransform>(), 0.5f, 1, -160, -276, 640, 290);
+            UiKit.Place(scroll.GetComponent<RectTransform>(), 0.5f, 1, -160, -306, 640, 262);
             _deckList = content;
 
             _edit = UiKit.MakeButton(panel.transform, "EDITAR MIS MAZOS", UiKit.PanelLight, () => { if (OnEditDecks != null) OnEditDecks(); }, 22);
-            UiKit.Place(_edit.GetComponent<RectTransform>(), 0.5f, 1, 340, -276, 280, 70);
-            var tip = UiKit.Label(panel.transform, "Crea mazos de 40 cartas con las cartas de tu base de datos (máx. 3 copias y 2 facciones). Necesitas una cuenta para guardarlos.", 15, UiKit.Muted, TextAnchor.UpperLeft);
-            UiKit.Place(tip.rectTransform, 0.5f, 1, 340, -356, 280, 140);
+            UiKit.Place(_edit.GetComponent<RectTransform>(), 0.5f, 1, 340, -306, 280, 70);
+            var tip = UiKit.Label(panel.transform, "Crea mazos de 40 cartas con las cartas de tu base de datos (máx. 3 copias y 2 facciones). Necesitas una cuenta (nombre + contraseña) para guardarlos.", 15, UiKit.Muted, TextAnchor.UpperLeft);
+            UiKit.Place(tip.rectTransform, 0.5f, 1, 340, -386, 280, 180);
 
             // ---- mazo del bot
             var botLabel = UiKit.Label(panel.transform, "MAZO DEL BOT", 18, UiKit.Muted, TextAnchor.LowerLeft, FontStyle.Bold);
@@ -120,7 +123,7 @@ namespace TimewarpTCG
         /// <summary>username == null: sin sesión (invitado).</summary>
         public void SetSession(string username)
         {
-            _session.text = username == null ? "Invitado: puedes jugar con AGGRO / CONTROL. Escribe un nombre y pulsa ENTRAR para usar tus mazos."
+            _session.text = username == null ? "Invitado: solo AGGRO / CONTROL. Para tus mazos, pulsa ENTRAR (o CREAR CUENTA la primera vez)."
                                               : "Sesión iniciada como <b>" + username + "</b>";
             _session.color = username == null ? UiKit.Muted : UiKit.Green;
             _edit.interactable = true;   // si no hay sesión, al pulsar se intenta entrar con el nombre escrito
@@ -189,6 +192,7 @@ namespace TimewarpTCG
         {
             _play.interactable = !busy;
             _login.interactable = !busy;
+            _register.interactable = !busy;
             _edit.interactable = !busy;
             UiKit.ButtonLabel(_play).text = busy ? "CONECTANDO…" : "JUGAR CONTRA EL BOT";
         }

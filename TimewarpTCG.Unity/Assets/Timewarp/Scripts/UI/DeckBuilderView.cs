@@ -257,8 +257,8 @@ namespace TimewarpTCG
             _busy = true; RefreshButtons();
             try
             {
-                var saved = await RestApi.SaveDeckAsync(_host, _userId, name, _draft.ToEntries());
-                _decks = await RestApi.GetDecksAsync(_host, _userId);
+                var saved = await RestApi.SaveDeckAsync(_host, name, _draft.ToEntries());
+                _decks = await RestApi.GetDecksAsync(_host);
                 _draft.SavedAs = saved.name; _draft.Name = saved.name;
                 _dirty = false;
                 ShowToast("Mazo «" + saved.name + "» guardado (" + saved.total + " cartas).", false);
@@ -276,8 +276,8 @@ namespace TimewarpTCG
             try
             {
                 string n = _draft.SavedAs;
-                await RestApi.DeleteDeckAsync(_host, _userId, n);
-                _decks = await RestApi.GetDecksAsync(_host, _userId);
+                await RestApi.DeleteDeckAsync(_host, n);
+                _decks = await RestApi.GetDecksAsync(_host);
                 _draft.Clear();
                 _suppressName = true; _nameInput.text = ""; _suppressName = false;
                 _dirty = false;

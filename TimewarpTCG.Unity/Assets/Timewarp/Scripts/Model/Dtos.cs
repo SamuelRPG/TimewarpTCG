@@ -93,7 +93,9 @@ namespace TimewarpTCG
         public List<string> targetIds = new List<string>();
     }
 
-    [Serializable] public class UserDto { public string id; public string username; }
+    // Respuesta de registro / login / invitado. "token" es un JWT firmado por el servidor: va en "Authorization: Bearer ..." y en el CONNECT de STOMP.
+    [Serializable] public class UserDto { public string id; public string username; public string token; public bool guest; }
+    [Serializable] public class AuthRequest { public string username; public string password; }
 
     // ---------- Catálogo y mazos (MenuController) ----------
     // El catálogo reutiliza CardDto: id = id de plantilla (p. ej. "U_AE_01"), currentCost/currentDrive = coste/drive base.
@@ -111,7 +113,6 @@ namespace TimewarpTCG
     [Serializable]
     public class SaveDeckRequest
     {
-        public string userId;
         public string deckName;
         public List<DeckEntryDto> entries = new List<DeckEntryDto>();
     }

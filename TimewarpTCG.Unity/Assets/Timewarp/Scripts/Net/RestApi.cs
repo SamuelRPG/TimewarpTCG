@@ -25,22 +25,26 @@ namespace TimewarpTCG
             return host;
         }
 
-        /// <summary>Entra con ese nombre; si no existe (404) lo registra. Devuelve el usuario con su UUID.</summary>
-        public static async Task<UserDto> LoginOrRegisterAsync(string host, string username)
+        /// <summary>Token de la sesión actual (lo fija quien inicia sesión). Se envía como "Authorization: Bearer ..." en las llamadas protegidas.</summary>
+        public static string Token;
+
+        // ---------------------------------------------------------------- cuentas
+        // El servidor identifica al jugador SOLO por el token firmado que devuelve esto. La contraseña va en el cuerpo (nunca en la URL).
+
+        public static Task<UserDto> RegisterAsync(string host, string username, string password) { return AuthCall(host, "/api/users/register", username, password); }
+        public static Task<UserDto> LoginAsync(string host, string username, string password) { return AuthCall(host, "/api/users/login", username, password); }
+
+        /// <summary>Identidad temporal de invitado (sin cuenta): solo permite jugar con los mazos AGGRO / CONTROL.</summary>
+        public static Task<UserDto> GuestAsync(string host) { return AuthCall(host, "/api/users/guest", null, null); }
+
+        static async Task<UserDto> AuthCall(string host, string path, string username, string password)
         {
-            string baseUrl = ToHttpBase(host);
-            string q = "?username=" + Uri.EscapeDataString(username);
-
-            HttpResponseMessage resp = await Http.PostAsync(baseUrl + "/api/users/login" + q, new StringContent(""));
-            if ((int)resp.StatusCode == 404)
-                resp = await Http.PostAsync(baseUrl + "/api/users/register" + q, new StringContent(""));
-
+            string json = path.EndsWith("/guest") ? "{}" : Json.ToJson(new AuthRequest { username = username, password = password });
+            var resp = await Http.PostAsync(ToHttpBase(host) + path, new StringContent(json, Encoding.UTF8, "application/json"));
             string body = await resp.Content.ReadAsStringAsync();
-            if (!resp.IsSuccessStatusCode)
-                throw new Exception("El servidor respondió " + (int)resp.StatusCode + " en usuarios. " + Shorten(body));
-
+            if (!resp.IsSuccessStatusCode) throw new Exception(ErrorText(body, (int)resp.StatusCode));
             var user = Json.FromJson<UserDto>(body);
-            if (user == null || string.IsNullOrEmpty(user.id)) throw new Exception("Respuesta de usuario inesperada: " + Shorten(body));
+            if (user == null || string.IsNullOrEmpty(user.id) || string.IsNullOrEmpty(user.token)) throw new Exception("Respuesta de usuario inesperada: " + Shorten(body));
             return user;
         }
 
@@ -53,33 +57,41 @@ namespace TimewarpTCG
             return Json.FromJson<CardList>("{\"items\":" + body + "}").items;
         }
 
-        /// <summary>Mazos guardados del usuario.</summary>
-        public static async Task<List<DeckDto>> GetDecksAsync(string host, string userId)
+        /// <summary>Mazos guardados del usuario de la sesión actual (requiere RestApi.Token).</summary>
+        public static async Task<List<DeckDto>> GetDecksAsync(string host)
         {
-            string body = await GetOk(ToHttpBase(host) + "/api/menu/decks?userId=" + Uri.EscapeDataString(userId));
+            string body = await GetOk(ToHttpBase(host) + "/api/menu/decks");
             return Json.FromJson<DeckList>("{\"items\":" + body + "}").items;
         }
 
         /// <summary>Crea el mazo o sustituye el que tenga ese nombre. Lanza Exception con el mensaje del servidor si no es legal
         /// (40 cartas exactas, máx. 3 copias por carta, máx. 2 facciones).</summary>
-        public static async Task<DeckDto> SaveDeckAsync(string host, string userId, string deckName, List<DeckEntryDto> entries)
+        public static async Task<DeckDto> SaveDeckAsync(string host, string deckName, List<DeckEntryDto> entries)
         {
-            string json = Json.ToJson(new SaveDeckRequest { userId = userId, deckName = deckName, entries = entries });
-            var resp = await Http.PostAsync(ToHttpBase(host) + "/api/menu/decks", new StringContent(json, Encoding.UTF8, "application/json"));
+            string json = Json.ToJson(new SaveDeckRequest { deckName = deckName, entries = entries });
+            var req = new HttpRequestMessage(HttpMethod.Post, ToHttpBase(host) + "/api/menu/decks") { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            var resp = await Http.SendAsync(WithAuth(req));
             string body = await resp.Content.ReadAsStringAsync();
             if (!resp.IsSuccessStatusCode) throw new Exception(ErrorText(body, (int)resp.StatusCode));
             return Json.FromJson<DeckDto>(body);
         }
 
-        public static async Task DeleteDeckAsync(string host, string userId, string deckName)
+        public static async Task DeleteDeckAsync(string host, string deckName)
         {
-            var resp = await Http.DeleteAsync(ToHttpBase(host) + "/api/menu/decks?userId=" + Uri.EscapeDataString(userId) + "&deckName=" + Uri.EscapeDataString(deckName));
+            var req = new HttpRequestMessage(HttpMethod.Delete, ToHttpBase(host) + "/api/menu/decks?deckName=" + Uri.EscapeDataString(deckName));
+            var resp = await Http.SendAsync(WithAuth(req));
             if (!resp.IsSuccessStatusCode) throw new Exception(ErrorText(await resp.Content.ReadAsStringAsync(), (int)resp.StatusCode));
+        }
+
+        static HttpRequestMessage WithAuth(HttpRequestMessage req)
+        {
+            if (!string.IsNullOrEmpty(Token)) req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Token);
+            return req;
         }
 
         static async Task<string> GetOk(string url)
         {
-            var resp = await Http.GetAsync(url);
+            var resp = await Http.SendAsync(WithAuth(new HttpRequestMessage(HttpMethod.Get, url)));
             string body = await resp.Content.ReadAsStringAsync();
             if (!resp.IsSuccessStatusCode) throw new Exception(ErrorText(body, (int)resp.StatusCode));
             return body;
