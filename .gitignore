@@ -38,3 +38,14 @@ TimewarpTCG.Unity/*.sln
 # Herramientas .NET
 [Bb]in/
 [Oo]bj/
+
+# --- Seguridad: nada de secretos ni de ficheros locales de IDE/BBDD en el repo ---
+.idea/
+data/
+*.mv.db
+*.trace.db
+.env
+*.env
+supabase.env.cmd
+application-local.properties
+application-*-local.properties

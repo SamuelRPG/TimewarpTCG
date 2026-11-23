@@ -1,4 +1,0 @@
-2026-05-08 13:32:48.289601+02:00 jdbc[3]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Error de Sintaxis en sentencia SQL "([*]'U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5', 4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS')"; se esperaba "(, SELECT, TABLE, VALUES"
-Syntax error in SQL statement "([*]'U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5', 4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS')"; expected "(, SELECT, TABLE, VALUES"; SQL statement:
-('U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5', 4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS') [42001-224]
