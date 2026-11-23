@@ -1,6 +1,8 @@
-// Dibuja una carta (unidad o hechizo) con uGUI. Todo por código; el tamaño de las fuentes escala con el de la carta.
+// Dibuja una carta (unidad o hechizo) con uGUI, con estilo de juego de cartas digital:
+// ilustración procedural arriba, banda con el nombre, gema de coste (azul) y de Drive (naranja), texto y keywords.
+// El tamaño de las fuentes escala con el de la carta. En tamaños pequeños (tablero) se usa un modo COMPACTO sin descripción:
+// los detalles salen en el panel "Inspector" al pasar el ratón.
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,6 +17,7 @@ namespace TimewarpTCG
         public bool hasOutline;    // borde de resalte (p. ej. posible objetivo)
         public Color outline;
         public string badge;       // etiqueta pequeña arriba a la derecha ("OBJ", "MOV")
+        public int count;          // si > 0, muestra "x N" (editor de mazos)
     }
 
     public sealed class CardView
@@ -31,6 +34,7 @@ namespace TimewarpTCG
             var border = UiKit.Box(parent, c != null ? "Card " + c.name : "CardBack", st.faceDown ? UiKit.PanelLight : faction);
             view.Root = border.rectTransform;
             UiKit.Size(border.gameObject, w, h);
+            border.gameObject.AddComponent<CanvasGroup>();
             UiKit.OnClick(border.gameObject, onClick, onEnter, onExit);
 
             if (st.selected) UiKit.AddOutline(border, UiKit.Gold, 4f);
@@ -43,77 +47,123 @@ namespace TimewarpTCG
                 return view;
             }
 
-            float k = Mathf.Min(h / 170f, w / 122f);
+            float k = Mathf.Min(w / 140f, h / 196f);
+            bool compact = w < 124f;
             int F(float s) { return Mathf.Max(8, Mathf.RoundToInt(s * k)); }
-
-            var inner = UiKit.Box(border.transform, "Inner", UiKit.Panel2, true, false);
-            UiKit.Stretch(inner.rectTransform, 3, 3, 3, 3);
             bool unit = GameRules.IsUnit(c);
 
-            // coste
-            var cost = UiKit.Box(inner.transform, "Cost", UiKit.Blue, true, false);
-            UiKit.Place(cost.rectTransform, 0, 1, 4 * k, -4 * k, 28 * k, 28 * k);
-            var costTxt = UiKit.Label(cost.transform, c.currentCost.ToString(), F(17), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiKit.Stretch(costTxt.rectTransform);
+            var inner = UiKit.Box(border.transform, "Inner", new Color32(17, 21, 36, 255), true, false);
+            UiKit.Stretch(inner.rectTransform, 3, 3, 3, 3);
+            float innerW = w - 6, pad = 5 * k;
 
-            // nombre
-            var name = UiKit.Label(inner.transform, c.name, F(13), UiKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);
-            UiKit.Place(name.rectTransform, 0, 1, 36 * k, -3 * k, w - 6 - 42 * k, 30 * k);
+            // ---- ilustración
+            float artH = compact ? (h - 6) * 0.50f : (h - 6) * 0.43f;
+            var art = UiKit.Box(inner.transform, "Art", Color.white, false, false);
+            art.sprite = ArtGen.Get(c.faction, c.name);
+            art.type = Image.Type.Simple;
+            art.preserveAspect = false;
+            UiKit.Place(art.rectTransform, 0, 1, pad, -pad, innerW - 2 * pad, artH);
+
+            // ---- banda del nombre (sobre el borde inferior de la ilustración)
+            float bandH = 24 * k;
+            var band = UiKit.Box(inner.transform, "NameBand", new Color(0.04f, 0.05f, 0.1f, 0.82f), false, false);
+            UiKit.Place(band.rectTransform, 0, 1, pad, -(pad + artH - bandH), innerW - 2 * pad, bandH);
+            var name = UiKit.Label(band.transform, c.name, F(13), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(name.rectTransform, 22 * k, 0, 22 * k, 0);
             UiKit.BestFit(name, 8, F(13));
 
-            // tipo / facción
-            string typeLine = unit ? "UNIDAD" : "HECHIZO " + (c.spellSpeed ?? "");
-            var type = UiKit.Label(inner.transform, typeLine.Trim() + "  " + GameRules.FactionName(c.faction), F(9), UiKit.Muted, TextAnchor.MiddleLeft);
-            UiKit.Place(type.rectTransform, 0, 1, 6 * k, -34 * k, w - 12, 14 * k);
+            // ---- gema de coste
+            float gem = 36 * k;
+            var cost = UiKit.CircleImage(inner.transform, "Cost", new Color32(60, 120, 230, 255));
+            UiKit.Place(cost.rectTransform, 0, 1, 1 * k, -1 * k, gem, gem);
+            UiKit.AddOutline(cost, new Color(1, 1, 1, 0.55f), 1.5f);
+            var costTxt = UiKit.Label(cost.transform, c.currentCost.ToString(), F(19), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(costTxt.rectTransform);
 
-            // descripción
-            var desc = UiKit.Label(inner.transform, c.description ?? "", F(10), new Color(0.85f, 0.88f, 0.95f), TextAnchor.UpperLeft);
-            UiKit.Place(desc.rectTransform, 0, 1, 6 * k, -50 * k, w - 12, Mathf.Max(10, h - 50 * k - 34 * k));
+            // ---- tipo y facción
+            float y = pad + artH + 3 * k;
+            string typeLine = unit ? "UNIDAD" : "HECHIZO" + (string.IsNullOrEmpty(c.spellSpeed) || c.spellSpeed == "NOT_A_SPELL" ? "" : " " + c.spellSpeed);
+            if (!compact) typeLine += "  ·  " + GameRules.FactionName(c.faction);
+            var type = UiKit.Label(inner.transform, typeLine, F(9), UiKit.Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
+            UiKit.Place(type.rectTransform, 0, 1, pad + 2 * k, -y, innerW - 2 * pad, 13 * k);
+            y += 14 * k;
 
-            // keywords
+            // ---- descripción (solo en tamaño normal)
+            float bottomReserve = 40 * k;
+            if (!compact)
+            {
+                var box = UiKit.Box(inner.transform, "DescBox", new Color(1, 1, 1, 0.06f), true, false);
+                float descH = Mathf.Max(12, h - 6 - y - bottomReserve);
+                UiKit.Place(box.rectTransform, 0, 1, pad, -y, innerW - 2 * pad, descH);
+                var desc = UiKit.Label(box.transform, c.description ?? "", F(10.5f), new Color(0.88f, 0.9f, 0.96f), TextAnchor.UpperLeft);
+                UiKit.Stretch(desc.rectTransform, 4 * k, 3 * k, 4 * k, 3 * k);
+            }
+
+            // ---- keywords como etiquetas
             if (c.keywords != null && c.keywords.Count > 0)
             {
-                var kw = UiKit.Label(inner.transform, string.Join(" · ", c.keywords.ToArray()), F(9), UiKit.Gold, TextAnchor.LowerLeft, FontStyle.Bold);
-                UiKit.Place(kw.rectTransform, 0, 0, 6 * k, 5 * k, w - 12 - 44 * k, 24 * k);
+                float x = pad;
+                int shown = 0;
+                foreach (var kw in c.keywords)
+                {
+                    if (compact && shown >= 1) break;
+                    string label = KeywordShort(kw, compact);
+                    float tw = (label.Length * 6.3f + 10) * k;
+                    var tag = UiKit.Box(inner.transform, "Tag", new Color32(255, 196, 61, 235), true, false);
+                    UiKit.Place(tag.rectTransform, 0, 0, x, 6 * k, tw, 15 * k);
+                    var tt = UiKit.Label(tag.transform, label, F(8.5f), Color.black, TextAnchor.MiddleCenter, FontStyle.Bold);
+                    UiKit.Stretch(tt.rectTransform);
+                    x += tw + 3 * k;
+                    shown++;
+                }
             }
 
-            // Drive (fuerza = vida) o velocidad del hechizo
+            // ---- Drive (unidades) o velocidad (hechizos)
             if (unit)
             {
-                var d = UiKit.Box(inner.transform, "Drive", UiKit.Orange, true, false);
-                UiKit.Place(d.rectTransform, 1, 0, -4 * k, 4 * k, 40 * k, 28 * k);
-                var dt = UiKit.Label(d.transform, c.currentDrive.ToString(), F(17), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+                float dg = 42 * k;
+                var d = UiKit.CircleImage(inner.transform, "Drive", new Color32(235, 125, 40, 255));
+                UiKit.Place(d.rectTransform, 1, 0, -1 * k, 1 * k, dg, dg);
+                UiKit.AddOutline(d, new Color(1, 1, 1, 0.55f), 1.5f);
+                var dt = UiKit.Label(d.transform, c.currentDrive.ToString(), F(21), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
                 UiKit.Stretch(dt.rectTransform);
             }
-            else if (!string.IsNullOrEmpty(c.spellSpeed))
+            else if (!string.IsNullOrEmpty(c.spellSpeed) && c.spellSpeed != "NOT_A_SPELL")
             {
-                var sp = UiKit.Box(inner.transform, "Speed", UiKit.Green, true, false);
-                UiKit.Place(sp.rectTransform, 1, 0, -4 * k, 4 * k, 52 * k, 20 * k);
+                var sp = UiKit.Box(inner.transform, "Speed", SpeedColor(c.spellSpeed), true, false);
+                UiKit.Place(sp.rectTransform, 1, 0, -pad, 6 * k, 56 * k, 18 * k);
                 var spt = UiKit.Label(sp.transform, c.spellSpeed, F(10), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
                 UiKit.Stretch(spt.rectTransform);
             }
 
-            // agotada
+            // ---- estados
             if (c.isExhausted && unit)
             {
                 var ov = UiKit.Box(inner.transform, "Exhausted", new Color(0, 0, 0, 0.5f), true, false);
                 UiKit.Stretch(ov.rectTransform);
-                var z = UiKit.Label(ov.transform, "AGOTADA", F(11), new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleCenter, FontStyle.Bold);
+                var z = UiKit.Label(ov.transform, "AGOTADA", F(11), new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleCenter, FontStyle.Bold);
                 UiKit.Stretch(z.rectTransform);
             }
 
-            // insignia
             string badge = st.badge;
             if (st.pending) badge = "MOV";
             if (!string.IsNullOrEmpty(badge))
             {
                 var b = UiKit.Box(inner.transform, "Badge", UiKit.Gold, true, false);
-                UiKit.Place(b.rectTransform, 1, 1, -3 * k, -3 * k, 36 * k, 16 * k);
+                UiKit.Place(b.rectTransform, 1, 1, -3 * k, -3 * k, 38 * k, 17 * k);
                 var bt = UiKit.Label(b.transform, badge, F(10), Color.black, TextAnchor.MiddleCenter, FontStyle.Bold);
                 UiKit.Stretch(bt.rectTransform);
             }
 
-            // "no jugable ahora"
+            if (st.count > 0)
+            {
+                var b = UiKit.Box(inner.transform, "Count", new Color32(20, 24, 40, 235), true, false);
+                UiKit.Place(b.rectTransform, 1, 1, -4 * k, -4 * k, 40 * k, 24 * k);
+                UiKit.AddOutline(b, UiKit.Gold, 1.5f);
+                var bt = UiKit.Label(b.transform, "x" + st.count, F(15), UiKit.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UiKit.Stretch(bt.rectTransform);
+            }
+
             if (st.dim)
             {
                 var dim = UiKit.Box(inner.transform, "Dim", new Color(0.05f, 0.06f, 0.1f, 0.55f), true, false);
@@ -121,6 +171,28 @@ namespace TimewarpTCG
             }
 
             return view;
+        }
+
+        static string KeywordShort(string kw, bool compact)
+        {
+            switch (kw)
+            {
+                case "DISRUPTION": return compact ? "DISR." : "DISRUPCIÓN";
+                case "JUMPER": return compact ? "SALTO" : "SALTO";
+                case "GLORY": return "GLORIA";
+                case "CHARGE": return "CARGA";
+                default: return kw;
+            }
+        }
+
+        static Color SpeedColor(string speed)
+        {
+            switch (speed)
+            {
+                case "INSTANT": return new Color32(200, 70, 190, 255);
+                case "FAST": return new Color32(60, 160, 90, 255);
+                default: return new Color32(190, 120, 40, 255);
+            }
         }
 
         /// <summary>Texto largo para el panel "Inspector" (al pasar el ratón por una carta).</summary>

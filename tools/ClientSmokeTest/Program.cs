@@ -110,6 +110,45 @@ static class Program
         s2.gamePhase = "COMBAT_OPEN";
         Check(GameRules.PlayHint(s2, Unit("h3", "U", 1), new HashSet<string>()) != null, "pista: unidades no entran en combate");
 
+        // ---- editor de mazos (DeckDraft): las mismas reglas que valida el servidor
+        {
+            var cat = new List<CardDto>();
+            foreach (var f in new[] { "ROMANS", "STEAMPUNK", "GLITCHPOP", "ANCIENT_EGYPT" })
+                for (int i = 0; i < 9; i++)
+                    cat.Add(new CardDto { id = f + "_" + i, name = "C" + i, cardType = i >= 6 ? "SPELL" : "UNIT", currentCost = 1 + i % 8, currentDrive = 2, faction = f });
+            var d = new DeckDraft(cat);
+            string why;
+            Check(d.Validate() != null && d.Total == 0, "mazo vacío no es válido");
+            var c0 = cat[0];
+            Check(d.Add(c0, out why) && d.Add(c0, out why) && d.Add(c0, out why), "3 copias caben");
+            Check(!d.Add(c0, out why) && why.Contains("3"), "la 4ª copia se rechaza: " + why);
+            Check(d.CountOf(c0.id) == 3 && d.Total == 3, "recuento");
+            // segunda facción OK, tercera rechazada
+            var steam = cat.First(c => c.faction == "STEAMPUNK"); var glitch = cat.First(c => c.faction == "GLITCHPOP");
+            Check(d.Add(steam, out why), "2ª facción permitida");
+            Check(!d.Add(glitch, out why) && why.ToLower().Contains("facciones"), "3ª facción rechazada: " + why);
+            Check(d.Factions().Count == 2, "2 facciones");
+            // llenar hasta 40 con las dos facciones y comprobar tope
+            foreach (var c in cat.Where(c => c.faction == "ROMANS" || c.faction == "STEAMPUNK"))
+                for (int i = 0; i < 3; i++) { if (d.Total >= 40) break; d.Add(c, out why); }
+            Check(d.Total == 40, "llega a 40 (tiene " + d.Total + ")");
+            Check(!d.Add(cat.First(c => c.faction == "ROMANS" && d.CountOf(c.id) < 3 || c.faction == "STEAMPUNK" && d.CountOf(c.id) < 3), out why) || d.Total == 40, "no pasa de 40");
+            d.Name = "Mi mazo";
+            Check(d.Validate() == null, "40 cartas, 2 facciones y nombre => válido: " + d.Validate());
+            d.Name = "aggro"; Check(d.Validate() != null && d.Validate().Contains("reservado"), "nombre reservado");
+            d.Name = "Mi mazo";
+            Check(d.ToEntries().Sum(e => e.quantity) == 40 && d.ToEntries().All(e => e.quantity >= 1 && e.quantity <= 3), "ToEntries suma 40 y respeta 1..3");
+            Check(d.CostCurve().Sum() == 40, "la curva suma 40");
+            Check(d.Units() + d.Spells() == 40, "unidades + hechizos = 40");
+            d.Remove(d.Cards()[0].Key.id);
+            Check(d.Total == 39 && d.Validate().Contains("Faltan 1"), "quitar una => faltan 1: " + d.Validate());
+            // cargar un mazo guardado (con una carta que ya no existe en el catálogo)
+            var saved = new DeckDto { name = "Guardado", total = 40, factions = new List<string> { "ROMANS" },
+                cards = new List<DeckEntryDto> { new DeckEntryDto { cardId = "ROMANS_0", quantity = 3 }, new DeckEntryDto { cardId = "NO_EXISTE", quantity = 2 } } };
+            var d2 = new DeckDraft(cat);
+            Check(d2.Load(saved) == 2 && d2.Total == 3 && d2.SavedAs == "Guardado" && d2.Name == "Guardado", "Load omite cartas inexistentes");
+        }
+
         Console.WriteLine(fails == 0 ? "autopruebas de lógica: OK" : "autopruebas: " + fails + " fallo(s)");
         return fails == 0;
     }

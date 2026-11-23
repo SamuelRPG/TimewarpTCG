@@ -26,3 +26,16 @@ Veinte líneas que muestran el protocolo STOMP “en crudo” (conectar, suscrib
 pip install websockets
 python3 tools/python/stomp_probe.py AGGRO
 ```
+
+## Probar mazos personalizados (flujo del editor de mazos)
+
+```bash
+dotnet run -c Release -- localhost:8080 CUSTOM 10            # registra un usuario, lee el catálogo, guarda un mazo legal por REST y juega con él
+dotnet run -c Release -- localhost:8080 CUSTOM 5 x CONTROL   # igual, pero el bot usa el mazo CONTROL (4º argumento libre, 5º = mazo del bot)
+```
+
+El informe incluye hechizos lanzados (y cuántos con objetivo), la profundidad máxima de la pila y cuántas pistas del cliente discrepan del servidor.
+
+## tools/catalog/generar_sql.py
+
+Genera `data.sql` y `docs/supabase/cartas.sql` desde `docs/catalogo/cartas.csv` (ver `docs/GUIA_ARRANQUE.md`, sección "Cómo añadir cartas nuevas").

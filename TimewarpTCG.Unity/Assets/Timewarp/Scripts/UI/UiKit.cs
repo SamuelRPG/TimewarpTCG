@@ -86,6 +86,46 @@ namespace TimewarpTCG
             }
         }
 
+        static Sprite _circle;
+        /// <summary>Círculo generado por código (para gemas de coste / drive).</summary>
+        public static Sprite Circle
+        {
+            get
+            {
+                if (_circle == null)
+                {
+                    const int S = 64;
+                    var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+                    tex.filterMode = FilterMode.Bilinear;
+                    tex.wrapMode = TextureWrapMode.Clamp;
+                    var px = new Color32[S * S];
+                    float r = S / 2f - 1f;
+                    for (int y = 0; y < S; y++)
+                        for (int x = 0; x < S; x++)
+                        {
+                            float dx = x + 0.5f - S / 2f, dy = y + 0.5f - S / 2f;
+                            float d = Mathf.Sqrt(dx * dx + dy * dy);
+                            px[y * S + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(Mathf.Clamp01(r - d + 0.5f) * 255f));
+                        }
+                    tex.SetPixels32(px);
+                    tex.Apply();
+                    _circle = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), 100f);
+                }
+                return _circle;
+            }
+        }
+
+        /// <summary>Imagen con el sprite circular.</summary>
+        public static Image CircleImage(Transform parent, string name, Color color)
+        {
+            var rt = NewRect(name, parent);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.sprite = Circle;
+            img.color = color;
+            img.raycastTarget = false;
+            return img;
+        }
+
         // ------------------------------------------------------------ rectángulos y anclajes
         public static RectTransform NewRect(string name, Transform parent)
         {
@@ -244,6 +284,15 @@ namespace TimewarpTCG
             var le = go.GetComponent<LayoutElement>();
             if (le == null) le = go.AddComponent<LayoutElement>();
             le.minWidth = w; le.preferredWidth = w; le.minHeight = h; le.preferredHeight = h;
+            return le;
+        }
+
+        /// <summary>Fija solo la altura preferida (para filas dentro de un VerticalLayoutGroup).</summary>
+        public static LayoutElement Height(GameObject go, float h)
+        {
+            var le = go.GetComponent<LayoutElement>();
+            if (le == null) le = go.AddComponent<LayoutElement>();
+            le.minHeight = h; le.preferredHeight = h;
             return le;
         }
 

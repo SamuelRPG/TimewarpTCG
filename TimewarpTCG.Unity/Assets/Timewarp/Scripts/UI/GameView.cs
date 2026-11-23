@@ -1,11 +1,13 @@
-// Pantalla de partida. Interacción por CLIC (sin arrastrar):
-//   - Carta de la mano  -> clic en tu Base / carril (unidades)  |  elegir objetivos y "LANZAR" (hechizos)
-//   - Unidad tuya lista -> clic en la zona de destino (mover)   |  los movimientos se confirman con "CONFIRMAR MOVIMIENTOS"
+// Pantalla de partida. Se puede jugar con CLIC o ARRASTRANDO (estilo juego de cartas digital):
+//   - Carta de la mano  -> clic o arrastrar a tu Base / carril (unidades) | hechizos: arrastrar sobre el objetivo, o clic + "LANZAR"
+//   - Unidad tuya lista -> clic o arrastrar a la zona de destino (mover) | los movimientos se confirman con "CONFIRMAR MOVIMIENTOS"
 //   - Botón grande      -> pasar prioridad
+// Los efectos visuales (números flotantes, partículas, banner de turno...) salen de los eventos que calcula StateDiff.Events.
 // El cliente solo da pistas visuales: el servidor valida y devuelve el error en español si algo es ilegal.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace TimewarpTCG
@@ -55,6 +57,23 @@ namespace TimewarpTCG
         bool _busy; float _busySince; string _lastKind, _lastCardId;
 
         const float BoardW = 104f, BoardH = 144f;
+        const float HandW = 150f, HandH = 210f;
+
+        // --- mano en abanico, arrastre y efectos
+        sealed class HandCard { public CardDto card; public RectTransform rt; public CardMotion mot; public bool fly; }
+        RectTransform _fxLayer, _dragLayer, _handBox;
+        Image _arrow, _arrowHead;
+        readonly List<HandCard> _handCards = new List<HandCard>();
+        int _hoverIdx = -1;
+        readonly Dictionary<string, RectTransform> _rects = new Dictionary<string, RectTransform>();      // id de carta -> su vista actual
+        readonly Dictionary<string, Vector2> _prevScreen = new Dictionary<string, Vector2>();             // id -> posición en pantalla del render anterior
+        readonly HashSet<string> _prevHandIds = new HashSet<string>();
+        RectTransform _ghost, _dragSourceRt;
+        CanvasGroup _dragSource;
+        bool _dragging, _dragFromHand;
+        CardDto _dragCard;
+        Zone _dragZone;
+        Zone? _dropHover;
 
         // ============================================================ construcción
         public GameView(Transform canvas)
@@ -63,12 +82,65 @@ namespace TimewarpTCG
             Root = bg.rectTransform;
             UiKit.Stretch(Root);
 
+            BuildAmbient();
             BuildHud();
             BuildLeftColumn();
             BuildBoard();
             BuildHandAndActions();
             BuildOverlays();
+            BuildFxLayers();
             Show(false);
+        }
+
+        // ------------------------------------------------------------ ambiente y capas de efectos
+        void BuildAmbient()
+        {
+            // motas de luz que flotan despacio por el fondo (decoración barata; se anima con Anim)
+            var layer = UiKit.NewRect("Ambient", Root);
+            UiKit.Stretch(layer);
+            Color[] tints = { new Color32(120, 150, 255, 255), new Color32(255, 190, 90, 255), new Color32(190, 120, 255, 255) };
+            for (int i = 0; i < 16; i++)
+            {
+                var m = UiKit.CircleImage(layer, "Mote", tints[i % tints.Length]);
+                var rt = m.rectTransform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                float sz = UnityEngine.Random.Range(50f, 190f);
+                rt.sizeDelta = new Vector2(sz, sz);
+                LoopMote(m);
+            }
+        }
+
+        void LoopMote(Image m)
+        {
+            if (m == null) return;
+            var rt = m.rectTransform;
+            Vector2 a = new Vector2(UnityEngine.Random.Range(-900f, 900f), UnityEngine.Random.Range(-620f, -150f));
+            Vector2 b = a + new Vector2(UnityEngine.Random.Range(-140f, 140f), UnityEngine.Random.Range(450f, 900f));
+            float dur = UnityEngine.Random.Range(14f, 28f), peak = UnityEngine.Random.Range(0.04f, 0.10f);
+            Anim.Run(dur, k =>
+            {
+                if (m == null) return false;
+                rt.anchoredPosition = Vector2.Lerp(a, b, k);
+                var c = m.color; c.a = peak * Mathf.Sin(k * Mathf.PI); m.color = c;
+                return true;
+            }, () => LoopMote(m), UnityEngine.Random.Range(0f, 6f));
+        }
+
+        void BuildFxLayers()
+        {
+            _dragLayer = UiKit.NewRect("DragLayer", Root);
+            UiKit.Stretch(_dragLayer);
+            _arrow = UiKit.Box(_dragLayer, "Arrow", UiKit.Gold, false, false);
+            _arrow.rectTransform.anchorMin = _arrow.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            _arrow.rectTransform.pivot = new Vector2(0f, 0.5f);
+            _arrowHead = UiKit.CircleImage(_dragLayer, "ArrowHead", UiKit.Gold);
+            _arrowHead.rectTransform.anchorMin = _arrowHead.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            _arrowHead.rectTransform.sizeDelta = new Vector2(34, 34);
+            _arrow.gameObject.SetActive(false); _arrowHead.gameObject.SetActive(false);
+
+            _fxLayer = UiKit.NewRect("FxLayer", Root);
+            UiKit.Stretch(_fxLayer);
+            Fx.Layer = _fxLayer;
         }
 
         void BuildHud()
@@ -177,13 +249,13 @@ namespace TimewarpTCG
 
         void BuildHandAndActions()
         {
-            var handBox = UiKit.Box(UiKit.Region(Root, "HandR", 0.185f, 0.765f, 0.8f, 1f), "Hand", UiKit.Panel);
+            var handBox = UiKit.Box(UiKit.Region(Root, "HandR", 0.185f, 0.765f, 0.8f, 1f), "Hand", new Color(0.09f, 0.11f, 0.18f, 0.55f));
             UiKit.Stretch(handBox.rectTransform);
+            _handBox = handBox.rectTransform;
             _handTitle = UiKit.Label(handBox.transform, "TU MANO", 13, UiKit.Muted, TextAnchor.UpperLeft, FontStyle.Bold);
             UiKit.Place(_handTitle.rectTransform, 0, 1, 8, -3, 400, 18);
             _hand = UiKit.NewRect("HandCards", handBox.transform);
-            UiKit.Stretch(_hand, 4, 22, 4, 4);
-            UiKit.HRow(_hand, 6, 2, TextAnchor.MiddleCenter);
+            UiKit.Stretch(_hand, 0, 0, 0, 0);   // las cartas se colocan a mano en abanico (LayoutHand), sin LayoutGroup
 
             var act = UiKit.Box(UiKit.Region(Root, "ActR", 0.8f, 0.765f, 1f, 1f), "Actions", UiKit.Panel);
             UiKit.Stretch(act.rectTransform);
@@ -250,6 +322,8 @@ namespace TimewarpTCG
             _logLines.Clear();
             _localPending.Clear();
             _busy = false;
+            _handCards.Clear(); _rects.Clear(); _prevScreen.Clear(); _prevHandIds.Clear();
+            _hoverIdx = -1; _dragging = false;
             ClearSelection();
             _gameOver.gameObject.SetActive(false);
             _disc.gameObject.SetActive(false);
@@ -297,9 +371,15 @@ namespace TimewarpTCG
             }
             _lastKind = null; _lastCardId = null;
 
+            // posiciones previas (para poder dibujar efectos donde estaba una carta que ya no existe) y eventos del cambio
+            _prevScreen.Clear();
+            foreach (var kv in _rects) if (kv.Value != null) _prevScreen[kv.Key] = Fx.ScreenPos(kv.Value);
+            var events = StateDiff.Events(prev, s);
+
             _state = s;
             ClearSelection();
             Render();
+            PlayFx(prev, s, events);
         }
 
         public void OnError(string message)
@@ -465,6 +545,8 @@ namespace TimewarpTCG
             var s = _state; var me = s.activePlayer; var op = s.opponent;
             var pending = Pending();
             bool over = GameRules.IsOver(s);
+            _rects.Clear();
+            _hoverIdx = -1;
 
             // --- HUD
             _hudTurn.text = "TURNO " + s.turn;
@@ -550,8 +632,17 @@ namespace TimewarpTCG
                     if (_picked.Contains(c.id)) { st.selected = true; st.badge = "OBJ"; }
                     else if (IsCandidate(c, z.mine)) { st.hasOutline = true; st.outline = UiKit.Green; }
                 }
-                CardView.Create(z.content, card, BoardW, BoardH, st,
+                var view = CardView.Create(z.content, card, BoardW, BoardH, st,
                     () => OnBoardCardClicked(card, z), () => Inspect(card), null);
+                _rects[c.id] = view.Root;
+                if (z.mine)
+                {
+                    var rt = view.Root; var zone = z.zone;
+                    var d = rt.gameObject.AddComponent<Draggable>();
+                    d.OnBegin = e => BeginDrag(card, false, zone, rt, e);
+                    d.OnMove = OnDragMove;
+                    d.OnEnd = EndDrag;
+                }
             }
         }
 
@@ -568,26 +659,80 @@ namespace TimewarpTCG
                     else if (_mode == Mode.MoveUnit)
                         hl = GameRules.MoveLooksLegal(_state, _selCard, _selZone, z.zone);
                 }
-                z.bg.color = hl ? (Color)new Color32(30, 96, 62, 255) : z.baseColor;
+                bool over = hl && z.mine && _dropHover.HasValue && _dropHover.Value == z.zone;
+                z.bg.color = hl ? (over ? (Color)new Color32(48, 150, 96, 255) : (Color)new Color32(30, 96, 62, 255)) : z.baseColor;
             }
         }
 
         void RenderHand(PlayerDto me, HashSet<string> pending)
         {
             UiKit.ClearChildren(_hand);
+            _handCards.Clear();
             var hand = me.hand ?? new List<CardDto>();
             _handTitle.text = "TU MANO (" + hand.Count + ")";
-            int n = Mathf.Max(1, hand.Count);
-            float avail = _hand.rect.width > 100 ? _hand.rect.width : 1180f;
-            float w = Mathf.Clamp((avail - 16 - (n - 1) * 6) / n, 68f, 122f);
-            float h = Mathf.Min(w / 122f * 170f, 176f);
-            foreach (var c in hand)
+            float W = _hand.rect.width > 100 ? _hand.rect.width : 1180f;
+            bool first = _prevHandIds.Count == 0;
+            var ids = new HashSet<string>();
+
+            for (int i = 0; i < hand.Count; i++)
             {
-                var card = c;
+                var card = hand[i];
+                int idx = i;
                 var st = new CardStyle();
-                st.selected = _selCard != null && _selFromHand && _selCard.id == c.id;
-                st.dim = GameRules.PlayHint(_state, c, pending) != null;
-                CardView.Create(_hand, card, w, h, st, () => OnHandClicked(card), () => Inspect(card), null);
+                st.selected = _selCard != null && _selFromHand && _selCard.id == card.id;
+                st.dim = GameRules.PlayHint(_state, card, pending) != null;
+                var view = CardView.Create(_hand, card, HandW, HandH, st,
+                    () => OnHandClicked(card),
+                    () => { if (_dragging) return; _hoverIdx = idx; Inspect(card); LayoutHand(false); },
+                    () => { if (_hoverIdx == idx) { _hoverIdx = -1; if (!_dragging) LayoutHand(false); } });
+                var rt = view.Root;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(HandW, HandH);
+                var mot = rt.gameObject.AddComponent<CardMotion>();
+                var d = rt.gameObject.AddComponent<Draggable>();
+                d.OnBegin = e => BeginDrag(card, true, Zone.Base, rt, e);
+                d.OnMove = OnDragMove;
+                d.OnEnd = EndDrag;
+                bool isNew = !first && !_prevHandIds.Contains(card.id);
+                _handCards.Add(new HandCard { card = card, rt = rt, mot = mot, fly = isNew });
+                ids.Add(card.id);
+                _rects[card.id] = rt;
+                if (isNew) rt.anchoredPosition = new Vector2(W / 2f + 260f, 0f);   // las cartas robadas entran volando desde la derecha
+            }
+            _prevHandIds.Clear();
+            foreach (var id in ids) _prevHandIds.Add(id);
+            if (_prevHandIds.Count == 0) _prevHandIds.Add("(vacia)");   // marca que ya hubo un primer render
+            LayoutHand(true);
+        }
+
+        /// <summary>Coloca la mano en abanico. La carta bajo el ratón sube y crece; las vecinas se apartan.</summary>
+        void LayoutHand(bool snap)
+        {
+            int n = _handCards.Count;
+            if (n == 0) return;
+            float W = _hand.rect.width > 100 ? _hand.rect.width : 1180f;
+            float H = _hand.rect.height > 60 ? _hand.rect.height : 230f;
+            float spacing = n > 1 ? Mathf.Min(HandW * 0.80f, (W - HandW - 30f) / (n - 1)) : 0f;
+            float baseY = -H / 2f + HandH / 2f - 62f;            // las cartas asoman por debajo del borde, como un abanico
+            float angle = n > 1 ? Mathf.Min(5f, 26f / (n - 1)) : 0f;
+            float drop = Mathf.Min(3.4f, 16f / n);
+            bool hovering = _hoverIdx >= 0 && !_dragging;
+
+            for (int i = 0; i < n; i++) _handCards[i].rt.SetSiblingIndex(i);
+            for (int i = 0; i < n; i++)
+            {
+                var h = _handCards[i];
+                float k = i - (n - 1) / 2f;
+                float x = k * spacing, y = baseY - k * k * drop, rot = -k * angle, sc = 1f;
+                if (hovering)
+                {
+                    if (i == _hoverIdx) { y = baseY + 124f; rot = 0f; sc = 1.28f; h.rt.SetAsLastSibling(); }
+                    else x += Mathf.Sign(i - _hoverIdx) * (HandW * 0.62f) / (1f + Mathf.Abs(i - _hoverIdx) * 0.6f);
+                }
+                h.mot.targetPos = new Vector2(x, y); h.mot.targetRot = rot; h.mot.targetScale = sc;
+                if (snap && !h.fly) h.mot.SnapNow();
+                if (snap) h.fly = false;
             }
         }
 
@@ -659,6 +804,224 @@ namespace TimewarpTCG
         bool HasLaneOption()
         {
             return _selCard != null && (GameRules.LaneLooksPlayable(_state, _selCard, Zone.Left) || GameRules.LaneLooksPlayable(_state, _selCard, Zone.Right));
+        }
+
+        // ============================================================ arrastrar y soltar
+        void BeginDrag(CardDto c, bool fromHand, Zone zone, RectTransform source, PointerEventData e)
+        {
+            if (_state == null || GameRules.IsOver(_state) || _busy) return;
+            _dragging = true; _dragCard = c; _dragFromHand = fromHand; _dragZone = zone;
+            _dragSourceRt = source; _hoverIdx = -1;
+
+            // misma selección que con un clic, pero SIN repintar (repintar destruiría la carta que se está arrastrando)
+            ClearSelection();
+            _selCard = c; _selFromHand = fromHand; _selZone = zone; _selDest = "MY_BASE"; _picked = new List<string>();
+            _mode = !fromHand ? Mode.MoveUnit : (GameRules.IsUnit(c) ? Mode.PlaceUnit : Mode.PickTargets);
+            string hint = fromHand ? GameRules.PlayHint(_state, c, Pending()) : GameRules.MoveHint(_state, c);
+            if (hint != null) ShowToast("Pista: " + hint, false);
+
+            float gw = fromHand ? HandW * 1.05f : BoardW * 1.3f, gh = fromHand ? HandH * 1.05f : BoardH * 1.3f;
+            var gv = CardView.Create(_dragLayer, c, gw, gh, new CardStyle(), null, null, null);
+            _ghost = gv.Root;
+            _ghost.anchorMin = _ghost.anchorMax = new Vector2(0.5f, 0.5f);
+            _ghost.sizeDelta = new Vector2(gw, gh);
+            var cg = _ghost.GetComponent<CanvasGroup>();
+            if (cg != null) { cg.blocksRaycasts = false; cg.alpha = 0.93f; }
+            _dragSource = source.GetComponent<CanvasGroup>();
+            if (_dragSource != null) _dragSource.alpha = 0.3f;
+
+            _dropHover = null;
+            ColorZones();
+            GlowTargets(true);
+            Inspect(c);
+            MoveGhost(e.position);
+        }
+
+        void OnDragMove(PointerEventData e)
+        {
+            if (!_dragging) return;
+            MoveGhost(e.position);
+            var z = ZoneAt(e.position);
+            Zone? h = z != null ? (Zone?)z.zone : null;
+            if (!Nullable.Equals(h, _dropHover)) { _dropHover = h; ColorZones(); }
+            UpdateArrow(e.position);
+        }
+
+        void EndDrag(PointerEventData e)
+        {
+            if (!_dragging) return;
+            _dragging = false;
+            Vector2 pos = e.position;
+            var c = _dragCard; bool fromHand = _dragFromHand; Zone from = _dragZone;
+            EndDragVisuals();
+
+            var zone = ZoneAt(pos);
+            if (fromHand && GameRules.IsUnit(c))
+            {
+                if (zone != null) OnZoneClicked(zone); else CancelDrag();
+            }
+            else if (fromHand)
+            {
+                int total = GameRules.TotalTargets(c);
+                if (total == 0)
+                {
+                    if (!Over(_handBox, pos)) DoPlay(c, "MY_BASE", new List<string>()); else CancelDrag();
+                }
+                else
+                {
+                    CardDto tgt; bool tMine; Zone tz;
+                    if (TargetAt(pos, out tgt, out tMine, out tz))
+                    {
+                        ToggleTarget(tgt, tMine);                       // repinta y marca el objetivo
+                        if (_picked.Count >= total) OnPrimary();         // si ya están todos, se lanza
+                    }
+                    else CancelDrag();
+                }
+            }
+            else
+            {
+                if (zone != null && zone.zone != from) DoMove(c, zone.zone); else CancelDrag();
+            }
+        }
+
+        void CancelDrag() { ClearSelection(); Render(); }
+
+        void EndDragVisuals()
+        {
+            if (_ghost != null) UnityEngine.Object.Destroy(_ghost.gameObject);
+            _ghost = null;
+            if (_dragSource != null) _dragSource.alpha = 1f;
+            _dragSource = null;
+            _arrow.gameObject.SetActive(false); _arrowHead.gameObject.SetActive(false);
+            _dropHover = null;
+            GlowTargets(false);
+            ColorZones();
+        }
+
+        void MoveGhost(Vector2 screen)
+        {
+            Vector2 local;
+            if (_ghost != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(_dragLayer, screen, null, out local))
+                _ghost.anchoredPosition = local;
+        }
+
+        /// <summary>Flecha dorada desde la carta hasta el puntero cuando se arrastra un hechizo que pide objetivo.</summary>
+        void UpdateArrow(Vector2 screen)
+        {
+            bool needs = _dragFromHand && _dragCard != null && GameRules.IsSpell(_dragCard) && GameRules.TotalTargets(_dragCard) > 0;
+            _arrow.gameObject.SetActive(needs); _arrowHead.gameObject.SetActive(needs);
+            if (!needs || _dragSourceRt == null) return;
+            Vector2 a, b;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_dragLayer, Fx.ScreenPos(_dragSourceRt), null, out a)) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_dragLayer, screen, null, out b)) return;
+            Vector2 d = b - a;
+            _arrow.rectTransform.anchoredPosition = a;
+            _arrow.rectTransform.sizeDelta = new Vector2(d.magnitude, 8f);
+            _arrow.rectTransform.localEulerAngles = new Vector3(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
+            _arrowHead.rectTransform.anchoredPosition = b;
+            CardDto tgt; bool tm; Zone tz;
+            bool good = TargetAt(screen, out tgt, out tm, out tz) && IsCandidate(tgt, tm);
+            _arrow.color = _arrowHead.color = good ? UiKit.Green : UiKit.Gold;
+        }
+
+        /// <summary>Resalta en verde las cartas del tablero que pueden ser objetivo del hechizo arrastrado.</summary>
+        void GlowTargets(bool on)
+        {
+            if (_state == null) return;
+            foreach (var kv in _rects)
+            {
+                if (kv.Value == null) continue;
+                var img = kv.Value.GetComponent<Image>();
+                if (img == null) continue;
+                CardDto c; bool mine; Zone z;
+                if (!GameRules.FindOnBoard(_state, kv.Key, out c, out mine, out z)) continue;
+                var o = img.GetComponent<Outline>();
+                if (on && _mode == Mode.PickTargets && IsCandidate(c, mine)) UiKit.AddOutline(img, UiKit.Green, 3f);
+                else if (!on && o != null) UnityEngine.Object.Destroy(o);
+            }
+        }
+
+        ZoneUi ZoneAt(Vector2 screen)
+        {
+            foreach (var z in new[] { _myBase, _myLeft, _myRight })
+                if (Over(z.bg.rectTransform, screen)) return z;
+            return null;
+        }
+
+        bool TargetAt(Vector2 screen, out CardDto card, out bool mine, out Zone zone)
+        {
+            foreach (var kv in _rects)
+            {
+                if (kv.Value == null || !Over(kv.Value, screen)) continue;
+                if (GameRules.FindOnBoard(_state, kv.Key, out card, out mine, out zone)) return true;
+            }
+            card = null; mine = false; zone = Zone.Base;
+            return false;
+        }
+
+        static bool Over(RectTransform rt, Vector2 screen) { return rt != null && RectTransformUtility.RectangleContainsScreenPoint(rt, screen, null); }
+
+        // ============================================================ efectos visuales según lo ocurrido
+        void PlayFx(GameStateDto prev, GameStateDto s, List<StateDiff.GameEvent> events)
+        {
+            try
+            {
+                if (prev == null)
+                {
+                    Fx.Banner("¡EMPIEZA LA PARTIDA!", "Turno " + s.turn + " · recurso " + s.activePlayer.resource, UiKit.Gold);
+                    return;
+                }
+                RectTransform rt;
+                foreach (var e in events)
+                {
+                    switch (e.kind)
+                    {
+                        case StateDiff.EventKind.Played:
+                        case StateDiff.EventKind.Moved:
+                            if (_rects.TryGetValue(e.cardId, out rt))
+                            {
+                                Fx.PopIn(rt);
+                                if (e.kind == StateDiff.EventKind.Played) Fx.Burst(Fx.ScreenPos(rt), e.mine ? UiKit.Blue : UiKit.Red, 10, 80f, 9f);
+                            }
+                            break;
+                        case StateDiff.EventKind.DriveChanged:
+                            if (_rects.TryGetValue(e.cardId, out rt))
+                            {
+                                int delta = e.b - e.a;
+                                Color col = delta > 0 ? UiKit.Green : UiKit.Red;
+                                Fx.FloatText(Fx.ScreenPos(rt), (delta > 0 ? "+" : "") + delta, col, 46);
+                                Fx.Flash(rt, col);
+                            }
+                            break;
+                        case StateDiff.EventKind.Destroyed:
+                            Vector2 p;
+                            if (_prevScreen.TryGetValue(e.cardId, out p))
+                            {
+                                Fx.Burst(p, UiKit.Orange, 20, 160f, 12f);
+                                Fx.Burst(p, UiKit.Red, 10, 100f, 8f);
+                                Fx.FloatText(p + new Vector2(0, 30), "DESTRUIDA", new Color32(255, 150, 90, 255), 28, 60f);
+                            }
+                            break;
+                        case StateDiff.EventKind.SpellOnStack:
+                            Fx.FloatText(Fx.ScreenPos(_stackText.rectTransform) + new Vector2(180, 0), e.cardName, e.mine ? UiKit.Blue : (Color)new Color32(230, 100, 220, 255), 34, 70f);
+                            break;
+                        case StateDiff.EventKind.CombatResolved:
+                            foreach (var zz in new[] { _oppLeft, _myLeft, _oppRight, _myRight }) Fx.Shake(zz.bg.rectTransform, 7f, 0.4f);
+                            break;
+                        case StateDiff.EventKind.Score:
+                            if (e.a > 0) { Fx.FloatText(Fx.ScreenPos(_hudScore.rectTransform) + new Vector2(-150, -30), "+" + e.a, UiKit.Blue, 40); Fx.Pulse(_hudScore.rectTransform, 1.2f); }
+                            if (e.b > 0) { Fx.FloatText(Fx.ScreenPos(_hudScore.rectTransform) + new Vector2(110, -30), "+" + e.b, UiKit.Red, 40); Fx.Pulse(_hudScore.rectTransform, 1.2f); }
+                            break;
+                        case StateDiff.EventKind.Turn:
+                            Fx.Banner("TURNO " + e.a, "Recurso " + s.activePlayer.resource + (s.activePlayer.hasPriority ? " · tienes la prioridad" : ""), UiKit.Gold, 0.6f);
+                            break;
+                        case StateDiff.EventKind.GameOver:
+                            Fx.Banner(e.mine ? "¡VICTORIA!" : "DERROTA", "Puntuación final " + s.activePlayer.score + " - " + s.opponent.score, e.mine ? UiKit.Green : UiKit.Red, 1.4f);
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex) { Debug.LogException(ex); }   // los efectos nunca deben romper la partida
         }
 
         // ============================================================ registro y avisos

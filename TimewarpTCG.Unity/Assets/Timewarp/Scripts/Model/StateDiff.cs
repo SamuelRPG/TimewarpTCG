@@ -37,6 +37,70 @@ namespace TimewarpTCG
             }
         }
 
+        // ====================================================================== eventos estructurados (para los efectos visuales)
+
+        public enum EventKind { Played, Moved, Destroyed, DriveChanged, Score, Turn, CombatResolved, SpellOnStack, GameOver }
+
+        public sealed class GameEvent
+        {
+            public EventKind kind;
+            public string cardId, cardName;
+            public bool mine;
+            public int a, b;       // DriveChanged: a=antes b=después | Score: a=puntos tuyos ganados b=del bot | Turn: a=nº de turno
+            public Zone zone;
+        }
+
+        /// <summary>Qué ha cambiado entre dos estados, de forma estructurada (misma lógica que Describe, pero con datos en vez de texto).</summary>
+        public static List<GameEvent> Events(GameStateDto prev, GameStateDto next)
+        {
+            var ev = new List<GameEvent>();
+            if (prev == null) return ev;
+
+            var before = new Dictionary<string, Seen>();
+            var after = new Dictionary<string, Seen>();
+            Index(prev, before);
+            Index(next, after);
+
+            foreach (var kv in after)
+            {
+                var a = kv.Value;
+                if (a.inHand) continue;
+                Seen b;
+                bool known = before.TryGetValue(kv.Key, out b);
+                if (!known || b.inHand)
+                    ev.Add(new GameEvent { kind = EventKind.Played, cardId = kv.Key, cardName = a.card.name, mine = a.mine, zone = a.zone });
+                else if (b.zone != a.zone)
+                    ev.Add(new GameEvent { kind = EventKind.Moved, cardId = kv.Key, cardName = a.card.name, mine = a.mine, zone = a.zone });
+                else if (b.card.currentDrive != a.card.currentDrive)
+                    ev.Add(new GameEvent { kind = EventKind.DriveChanged, cardId = kv.Key, cardName = a.card.name, mine = a.mine, a = b.card.currentDrive, b = a.card.currentDrive, zone = a.zone });
+            }
+            foreach (var kv in before)
+            {
+                var b = kv.Value;
+                if (b.inHand) continue;
+                if (!after.ContainsKey(kv.Key))
+                    ev.Add(new GameEvent { kind = EventKind.Destroyed, cardId = kv.Key, cardName = b.card.name, mine = b.mine, a = b.card.currentDrive, zone = b.zone });
+            }
+
+            var prevIds = new HashSet<string>();
+            if (prev.spellStack != null) foreach (var e in prev.spellStack) prevIds.Add(e.cardId);
+            if (next.spellStack != null)
+                foreach (var e in next.spellStack)
+                    if (!prevIds.Contains(e.cardId))
+                        ev.Add(new GameEvent { kind = EventKind.SpellOnStack, cardId = e.cardId, cardName = e.cardName, mine = e.ownerId == next.activePlayer.id });
+
+            bool wasCombat = prev.gamePhase == "COMBAT_OPEN" || prev.gamePhase == "COMBAT_CLOSED";
+            if (wasCombat && next.gamePhase == "MAIN_OPEN" && next.turn == prev.turn)
+                ev.Add(new GameEvent { kind = EventKind.CombatResolved });
+
+            int dMe = next.activePlayer.score - prev.activePlayer.score;
+            int dBot = next.opponent.score - prev.opponent.score;
+            if (next.turn != prev.turn) ev.Add(new GameEvent { kind = EventKind.Turn, a = next.turn });
+            if (dMe != 0 || dBot != 0) ev.Add(new GameEvent { kind = EventKind.Score, a = dMe, b = dBot });
+            if (GameRules.IsOver(next) && !GameRules.IsOver(prev)) ev.Add(new GameEvent { kind = EventKind.GameOver, mine = GameRules.IWon(next) });
+            return ev;
+        }
+
         public static List<string> Describe(GameStateDto prev, GameStateDto next)
         {
             var lines = new List<string>();
