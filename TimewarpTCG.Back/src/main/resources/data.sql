@@ -1,30 +1,41 @@
--- Borramos las cartas viejas por si reiniciamos el servidor para no tener duplicados
+-- GENERADO por tools/catalog/generar_sql.py desde docs/catalogo/cartas.csv. No lo edites a mano.
+-- Solo se ejecuta con el perfil demo (H2 en memoria).
 DELETE FROM card_templates;
 
--- Insertamos nuestro catálogo de cartas inicial
-INSERT INTO card_templates (
-    id, name, description, base_cost, base_drive, card_type, spell_speed, targets, keywords, effects, faction
-) VALUES
-
--- 1. Carta Básica (Sin efectos, ideal para mazos Aggro)
-('U_AE_01', 'Infantería Rápida', 'Unidad básica y veloz del imperio.',
- 1, 2, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'ANCIENT_EGYPT'),
-
--- 2. Carta con Keyword (Tiene "JUMPER", se salta las reglas de movimiento)
-('U_SP_01', 'Dron Explorador', 'Puede moverse libremente de un campo a otro.',
- 2, 1, 'UNIT', 'NOT_A_SPELL', 'NONE', 'JUMPER', 'NONE', 'STEAMPUNK'),
-
--- 3. Carta con Efecto al Entrar (Requiere elegir a 1 Aliado para darle el Buff)
-('U_RM_01', 'Centurión de Vanguardia', 'Al entrar en juego, da +2 de Drive a un aliado.',
- 3, 4, 'UNIT', 'NOT_A_SPELL', '1:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:2', 'ROMANS'),
-
--- 4. Carta con Efecto Reactivo (Se enfurece al recibir daño)
-('U_GP_01', 'Ciborg Mutante', 'Si sobrevive al daño, gana +2 de Drive.',
- 4, 5, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_DAMAGE_TAKEN:SELF_BUFF:2', 'GLITCHPOP'),
-
--- 5. Hechizo Rápido de Daño (Requiere elegir a 1 Enemigo para dañarlo)
-('S_GP_01', 'Virus Táctico', 'Inflige 3 de daño a una unidad enemiga.',
- 2, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'GLITCHPOP'),
-
-('U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5',
-    4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS');
+INSERT INTO card_templates (id, name, description, base_cost, base_drive, card_type, spell_speed, targets, keywords, effects, faction) VALUES
+('U_AE_01', 'Infantería Rápida', 'Unidad básica y veloz del imperio.', 1, 2, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'ANCIENT_EGYPT'),
+('U_AE_02', 'Escriba del Templo', 'Un erudito que lucha tan bien como escribe.', 2, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'ANCIENT_EGYPT'),
+('U_AE_03', 'Guardián de Arena', 'Si sobrevive a un daño, gana +1 de Drive.', 3, 4, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_DAMAGE_TAKEN:SELF_BUFF:1', 'ANCIENT_EGYPT'),
+('U_AE_04', 'Momia Vengativa', 'Al ganar un combate, gana +2 de Drive.', 3, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_COMBAT_WIN:SELF_BUFF:2', 'ANCIENT_EGYPT'),
+('U_AE_05', 'Sacerdote de Ra', 'Al entrar en juego, da +2 de Drive a un aliado.', 3, 3, 'UNIT', 'NOT_A_SPELL', '1:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:2', 'ANCIENT_EGYPT'),
+('U_AE_06', 'Faraón Eterno', 'Al entrar en juego, da +1 de Drive a dos aliados.', 6, 7, 'UNIT', 'NOT_A_SPELL', '2:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:1', 'ANCIENT_EGYPT'),
+('S_AE_01', 'Bendición del Nilo', 'Instantáneo. +2 de Drive a una unidad aliada.', 1, 0, 'SPELL', 'INSTANT', '1:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:2', 'ANCIENT_EGYPT'),
+('S_AE_02', 'Plaga de Langostas', 'Rápido. Inflige 3 de daño a una unidad enemiga.', 3, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'ANCIENT_EGYPT'),
+('S_AE_03', 'Tormenta de Arena', 'Lento. Inflige 3 de daño a dos unidades enemigas.', 5, 0, 'SPELL', 'SLOW', '2:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'ANCIENT_EGYPT'),
+('U_RM_01', 'Centurión de Vanguardia', 'Al entrar en juego, da +2 de Drive a un aliado.', 3, 4, 'UNIT', 'NOT_A_SPELL', '1:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:2', 'ROMANS'),
+('U_RM_02', 'Cazador de Recompensas', 'Hace 1 de daño al entrar. Si muere, gana +5', 4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:HUNTER_MARK:1:5', 'ROMANS'),
+('U_RM_03', 'Legionario', 'Soldado disciplinado de las legiones.', 2, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'ROMANS'),
+('U_RM_04', 'Vélite Emboscador', 'Disrupción: puede jugarse directamente en un carril disputado.', 2, 2, 'UNIT', 'NOT_A_SPELL', 'NONE', 'DISRUPTION', 'NONE', 'ROMANS'),
+('U_RM_05', 'Gladiador', 'Gloria: al ganar un combate se recupera y puede volver a moverse.', 4, 5, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_COMBAT_WIN:READY_SELF', 'ROMANS'),
+('U_RM_06', 'Tribuno de la Legión', 'Al entrar en juego, inflige 2 de daño a una unidad enemiga.', 5, 5, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:2', 'ROMANS'),
+('S_RM_01', 'Testudo', 'Instantáneo. +3 de Drive a una unidad aliada.', 2, 0, 'SPELL', 'INSTANT', '1:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:3', 'ROMANS'),
+('S_RM_02', 'Lluvia de Jabalinas', 'Rápido. Inflige 2 de daño a una unidad enemiga.', 2, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:2', 'ROMANS'),
+('S_RM_03', 'Orden de Carga', 'Lento. +2 de Drive a dos unidades aliadas.', 4, 0, 'SPELL', 'SLOW', '2:ALLY', 'NONE', 'ON_PLACED:ALLY_BOOST:2', 'ROMANS'),
+('U_SP_01', 'Dron Explorador', 'Puede moverse libremente de un campo a otro.', 2, 1, 'UNIT', 'NOT_A_SPELL', 'NONE', 'JUMPER', 'NONE', 'STEAMPUNK'),
+('U_SP_02', 'Autómata de Vapor', 'Resistente y sin emociones.', 2, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'STEAMPUNK'),
+('U_SP_03', 'Ingeniero Chispeante', 'Al entrar en juego, roba 1 carta.', 3, 2, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_PLACED:DRAW:1', 'STEAMPUNK'),
+('U_SP_04', 'Carro Blindado', 'Salto. Al confirmar su movimiento a un carril gana +1 de Drive.', 4, 4, 'UNIT', 'NOT_A_SPELL', 'NONE', 'JUMPER', 'ON_MOVEMENT_CONFIRMED:CHARGE_BUFF:1', 'STEAMPUNK'),
+('U_SP_05', 'Zepelín de Asalto', 'Disrupción y Salto: entra a un carril disputado y se mueve entre carriles.', 4, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'DISRUPTION,JUMPER', 'NONE', 'STEAMPUNK'),
+('U_SP_06', 'Gólem de Hierro', 'Una montaña de engranajes.', 6, 8, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'STEAMPUNK'),
+('S_SP_01', 'Engranaje Extra', 'Instantáneo. Roba 1 carta.', 1, 0, 'SPELL', 'INSTANT', 'NONE', 'NONE', 'ON_PLACED:DRAW:1', 'STEAMPUNK'),
+('S_SP_02', 'Rayo de Tesla', 'Rápido. Inflige 4 de daño a una unidad enemiga.', 4, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:4', 'STEAMPUNK'),
+('S_SP_03', 'Planos Secretos', 'Lento. Roba 2 cartas.', 3, 0, 'SPELL', 'SLOW', 'NONE', 'NONE', 'ON_PLACED:DRAW:2', 'STEAMPUNK'),
+('U_GP_01', 'Ciborg Mutante', 'Si sobrevive al daño, gana +2 de Drive.', 4, 5, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_DAMAGE_TAKEN:SELF_BUFF:2', 'GLITCHPOP'),
+('U_GP_02', 'Píxel Rebelde', 'Al ganar un combate, gana +1 de Drive.', 1, 2, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_COMBAT_WIN:SELF_BUFF:1', 'GLITCHPOP'),
+('U_GP_03', 'DJ Sintético', 'Al entrar en juego, roba 1 carta.', 3, 3, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_PLACED:DRAW:1', 'GLITCHPOP'),
+('U_GP_04', 'Hacker Fantasma', 'Disrupción. Al entrar en juego, inflige 2 de daño a una unidad enemiga.', 4, 3, 'UNIT', 'NOT_A_SPELL', '1:ENEMY', 'DISRUPTION', 'ON_PLACED:ENEMY_DAMAGE:2', 'GLITCHPOP'),
+('U_GP_05', 'Avatar Corrupto', 'Si sobrevive al daño, gana +1. Gloria: al ganar un combate se recupera.', 5, 6, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'ON_DAMAGE_TAKEN:SELF_BUFF:1;ON_COMBAT_WIN:READY_SELF', 'GLITCHPOP'),
+('U_GP_06', 'Titán Glitch', 'Un coloso de datos corruptos.', 7, 10, 'UNIT', 'NOT_A_SPELL', 'NONE', 'NONE', 'NONE', 'GLITCHPOP'),
+('S_GP_01', 'Virus Táctico', 'Inflige 3 de daño a una unidad enemiga.', 2, 0, 'SPELL', 'FAST', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:3', 'GLITCHPOP'),
+('S_GP_02', 'Cortocircuito', 'Instantáneo. Inflige 1 de daño a una unidad enemiga.', 1, 0, 'SPELL', 'INSTANT', '1:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:1', 'GLITCHPOP'),
+('S_GP_03', 'Desfase Temporal', 'Lento. Inflige 5 de daño a dos unidades enemigas.', 6, 0, 'SPELL', 'SLOW', '2:ENEMY', 'NONE', 'ON_PLACED:ENEMY_DAMAGE:5', 'GLITCHPOP');
