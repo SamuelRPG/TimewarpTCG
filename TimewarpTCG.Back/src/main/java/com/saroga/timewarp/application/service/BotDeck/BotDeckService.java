@@ -93,7 +93,7 @@ public class BotDeckService {
         Map<String, Integer> copies = new HashMap<>();
 
         fill(deck, copies, units, DECK_SIZE - spellTarget);
-        fill(deck, copies, spells, spellTarget);
+        fill(deck, copies, spells, DECK_SIZE);                            // el parametro es el tamaño FINAL del mazo, no el nº de hechizos
         fill(deck, copies, pool, DECK_SIZE);                              // rellena lo que falte con lo que sea
 
         if (deck.size() != DECK_SIZE) throw new IllegalStateException("no se pudo completar el mazo (" + deck.size() + ")");

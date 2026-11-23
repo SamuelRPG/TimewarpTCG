@@ -147,6 +147,8 @@ public class DeckRulesAndBotDeckTest {
             assertTrue(t.stream().map(CardTemplate::getFaction).distinct().count() <= 2, "mas de 2 facciones");
             long units = t.stream().filter(c -> c.getCardType() == CardType.UNIT).count();
             assertTrue(units >= 24, "demasiados pocos unidades: " + units);
+            long spells = 40 - units;
+            assertTrue(spells >= 6 && spells <= 12, "el mazo debe llevar entre 6 y 12 hechizos; lleva " + spells);
             signatures.add(new TreeMap<>(copies).toString());
         }
         assertTrue(signatures.size() > 100, "los mazos deberian variar; distintos: " + signatures.size());
