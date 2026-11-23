@@ -5,11 +5,14 @@ import com.saroga.timewarp.application.service.Deck.DeckService;
 import com.saroga.timewarp.domain.model.entity.cardTemplate.CardTemplate;
 import com.saroga.timewarp.domain.model.enums.Faction;
 import com.saroga.timewarp.domain.repository.cardCatalog.CardCatalogRepository;
+import com.saroga.timewarp.infrastructure.security.AuthInterceptor;
+import com.saroga.timewarp.infrastructure.security.AuthPrincipal;
 import com.saroga.timewarp.infrastructure.web.dto.request.SaveDeckRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.CatalogCardDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.DeckDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.DeckEntryDto;
 import com.saroga.timewarp.infrastructure.web.dto.response.TargetReqDto;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,12 +21,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/menu")
-@CrossOrigin(origins = "*")
 public class MenuController {
 
     private final CardCatalogRepository cardCatalogRepository;
@@ -45,10 +46,12 @@ public class MenuController {
                 .collect(Collectors.toList());
     }
 
-    // Mazos guardados del usuario
+    // Mazos guardados del usuario AUTENTICADO (el usuario sale del token, no de un parametro: nadie puede ver los mazos de otro)
     @GetMapping("/decks")
-    public ResponseEntity<?> getDecks(@RequestParam("userId") UUID userId) {
-        List<DeckDto> decks = deckService.getUserDecks(userId).stream()
+    public ResponseEntity<?> getDecks(HttpServletRequest request) {
+        AuthPrincipal me = AuthInterceptor.require(request);
+        if (me.guest()) return ResponseEntity.ok(List.of());
+        List<DeckDto> decks = deckService.getUserDecks(me.userId()).stream()
                 .map(MenuController::toDeckDto)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(decks);
@@ -56,9 +59,10 @@ public class MenuController {
 
     // Unity llama aquí al pulsar el botón "Guardar Mazo". Crea el mazo o, si ya existe uno con ese nombre, lo sustituye.
     @PostMapping("/decks")
-    public ResponseEntity<?> saveDeck(@RequestBody SaveDeckRequestDto request) {
+    public ResponseEntity<?> saveDeck(@RequestBody SaveDeckRequestDto request, HttpServletRequest http) {
+        AuthPrincipal me = AuthInterceptor.require(http);
+        if (me.guest()) return ResponseEntity.status(403).body(Map.of("error", "Los invitados no pueden guardar mazos. Inicia sesión con tu cuenta."));
         try {
-            if (request.userId == null) throw new IllegalArgumentException("Falta el usuario.");
             Map<String, Integer> cards = new LinkedHashMap<>();
             if (request.entries != null) {
                 for (DeckEntryDto e : request.entries) {
@@ -68,8 +72,8 @@ public class MenuController {
             } else if (request.cards != null) {
                 cards.putAll(request.cards);
             }
-            String savedName = deckService.saveCustomDeck(request.userId, request.deckName, cards);
-            StoredDeck saved = deckService.getUserDecks(request.userId).stream()
+            String savedName = deckService.saveCustomDeck(me.userId(), request.deckName, cards);
+            StoredDeck saved = deckService.getUserDecks(me.userId()).stream()
                     .filter(d -> d.name().equalsIgnoreCase(savedName)).findFirst().orElseThrow();
             return ResponseEntity.ok(toDeckDto(saved));
         } catch (IllegalArgumentException e) {
@@ -79,8 +83,10 @@ public class MenuController {
     }
 
     @DeleteMapping("/decks")
-    public ResponseEntity<?> deleteDeck(@RequestParam("userId") UUID userId, @RequestParam("deckName") String deckName) {
-        boolean deleted = deckService.deleteDeck(userId, deckName);
+    public ResponseEntity<?> deleteDeck(@RequestParam("deckName") String deckName, HttpServletRequest http) {
+        AuthPrincipal me = AuthInterceptor.require(http);
+        if (me.guest()) return ResponseEntity.status(403).body(Map.of("error", "Los invitados no tienen mazos."));
+        boolean deleted = deckService.deleteDeck(me.userId(), deckName);
         if (!deleted) return ResponseEntity.status(404).body(Map.of("error", "Mazo no encontrado: " + deckName));
         return ResponseEntity.ok(Map.of("message", "Mazo borrado"));
     }

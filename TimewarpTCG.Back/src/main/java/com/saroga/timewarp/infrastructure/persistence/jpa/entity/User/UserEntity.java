@@ -14,9 +14,16 @@ public class UserEntity {
     @Column(nullable = false, unique = true)
     private String username;
 
+    /** Hash BCrypt de la contrasena. null = cuenta antigua creada cuando solo hacia falta el nombre. */
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
     // Constructores, Getters y Setters
     public UserEntity() {}
     public UserEntity(String username) { this.username = username; }
+    public UserEntity(String username, String passwordHash) { this.username = username; this.passwordHash = passwordHash; }
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

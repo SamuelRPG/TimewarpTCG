@@ -8,4 +8,6 @@ public interface GameRepositoryPort {
     void save (GameState gameState);
     GameState findById(UUID gameId);
     void delete(UUID gameId);
+    /** Borra las partidas en las que participa el jugador (solo se permite una partida activa por jugador). */
+    void deleteByPlayerId(UUID playerId);
 }
