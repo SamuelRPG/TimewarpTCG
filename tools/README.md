@@ -1,6 +1,6 @@
 # Tools (opcionales)
 
-Sirven para comprobar el backend **sin abrir Unity**. Necesitan el backend en marcha (`00_EMPIEZA_AQUI.md`, paso 1).
+Sirven para comprobar el backend **sin abrir Unity**. Necesitan el backend en marcha (`docs/GUIA_ARRANQUE.md`, punto 2).
 
 ## ClientSmokeTest (C#, .NET 8)
 
@@ -14,6 +14,9 @@ cd tools/ClientSmokeTest
 dotnet run -c Release -- localhost:8080 AGGRO 10        # host  mazo  nº de partidas
 dotnet run -c Release -- localhost:8080 CONTROL 3 v     # "v" = imprime el registro de cada jugada
 ```
+
+El agente entra como **invitado** (o con una cuenta que registra él mismo en el modo `CUSTOM`): el servidor exige token en REST y WebSocket.
+Va a un ritmo de unas 18 acciones por segundo, como un jugador muy rápido, porque el servidor limita las ráfagas de mensajes por sesión.
 
 Salida esperada con el backend parcheado: todas las partidas `GAMEOVER` (AGGRO) o `STALLED` (CONTROL contra CONTROL no termina: ver B6 en
 `02_PROBLEMAS_Y_HOJA_DE_RUTA.md`), y `RESULTADO: OK`. Si ves `STUCK` o timeouts, el backend se ha colgado.
@@ -35,6 +38,17 @@ dotnet run -c Release -- localhost:8080 CUSTOM 5 x CONTROL   # igual, pero el bo
 ```
 
 El informe incluye hechizos lanzados (y cuántos con objetivo), la profundidad máxima de la pila y cuántas pistas del cliente discrepan del servidor.
+
+## Comprobar la seguridad con ataques reales
+
+```bash
+dotnet run -c Release -- localhost:8080 SECURITY 1
+```
+
+Lanza contra el servidor en marcha los ataques típicos y comprueba que **todos** fallan: pedir mazos sin token o con uno falso, borrar cuentas sin
+autenticar, conectar al WebSocket sin token, suscribirse al canal de otro jugador, iniciar una partida diciendo ser otro, actuar en la
+partida de otro, usar un mazo propio siendo invitado e inundar el servidor de mensajes. Termina con `SEGURIDAD: TODO OK` (código de salida 0)
+o lista los fallos. Conviene ejecutarlo tras cualquier cambio en `infrastructure/security`.
 
 ## tools/catalog/generar_sql.py
 

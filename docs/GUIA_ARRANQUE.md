@@ -25,7 +25,11 @@ git checkout feature/unity-sobre-develop
 
 ## 1. ¿Hace falta Supabase? No
 
-Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jugar contra el bot no hace falta: los mazos AGGRO y CONTROL salen del código. Pero tu backend intenta conectarse a Supabase al arrancar y si falla no arranca, así que **arráncalo siempre con el perfil `demo`** (base de datos en memoria, sin internet, sin tocar Supabase).
+Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jugar contra el bot no hace falta: los mazos AGGRO y CONTROL salen del código.
+
+**Por defecto el servidor arranca con una base de datos en memoria (H2)**: sin internet, sin Supabase y sin configurar nada. Las 36 cartas se cargan solas. Lo que se pierde al cerrar el servidor son las cuentas y los mazos que crees. Para guardarlos en Supabase, mira el punto 6.
+
+> Esto cambió respecto a versiones anteriores de esta guía: ya **no** hace falta el perfil `demo` ni tocar `application.properties`. Ese fichero ya no contiene ninguna contraseña.
 
 ## 2. Arrancar el backend
 
@@ -35,13 +39,8 @@ Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jug
 
 1. Abre en IntelliJ la carpeta **`TimewarpTCG.Back`** (*File ▸ Open*). Si pregunta por el proyecto Maven, acepta ("Trust" / "Load Maven project").
 2. **Java:** vale **Java 21 o superior (incluido el 25 que ya tienes)**. *File ▸ Project Structure ▸ Project ▸ SDK* → elige tu JDK 25 (o *Add SDK ▸ Download JDK…* si no aparece). Deja *Language level* en 21 (así lo pide el `pom.xml`).
-3. Abre `src/main/java/com/saroga/timewarp/TimewarpApplication.java` y pulsa el triángulo verde junto a `main` ▸ *Run*. Fallará por la base de datos: es normal, solo sirve para crear la configuración.
-4. *Run ▸ Edit Configurations…* ▸ selecciona **TimewarpApplication** ▸ *Modify options* ▸ marca **Add VM options** ▸ en el campo que aparece escribe exactamente:
-
-   ```
-   -Dspring.profiles.active=demo
-   ```
-5. OK ▸ Run. Listo cuando la consola ponga `Started TimewarpApplication in … seconds`.
+3. Abre `src/main/java/com/saroga/timewarp/TimewarpApplication.java` y pulsa el triángulo verde junto a `main` ▸ *Run*. Listo cuando la consola ponga `Started TimewarpApplication in … seconds`.
+4. Si IntelliJ se queja de que Lombok no genera nada: *Settings ▸ Build, Execution, Deployment ▸ Compiler ▸ Annotation Processors ▸ Enable annotation processing*.
 
 ### Camino B: con la terminal (sin instalar Maven)
 
@@ -51,7 +50,7 @@ En PowerShell, entra en la carpeta del backend y ejecuta:
 
 ```powershell
 cd C:\ruta\a\tu\repo\TimewarpTCG.Back
-.\mvnw.cmd "-Dmaven.test.skip=true" spring-boot:run "-Dspring-boot.run.profiles=demo"
+.\mvnw.cmd "-Dmaven.test.skip=true" spring-boot:run
 ```
 
 **En PowerShell los `-D…` deben ir entre comillas** (si no, parte `-Dmaven.test.skip=true` por el punto y da `Unknown lifecycle phase ".test.skip=true"`). Los avisos `WARNING: … Unsafe` / `native access` del principio son normales.
@@ -67,10 +66,12 @@ La primera vez tarda unos minutos (descarga Maven y las librerías). Si dice que
 Con el servidor en marcha, en otra PowerShell:
 
 ```powershell
-Invoke-RestMethod -Method Post "http://localhost:8080/api/users/register?username=prueba"
+Invoke-RestMethod -Method Post "http://localhost:8080/api/users/guest"
 ```
 
-Debe devolver un `id` y `username`.
+Debe devolver un `id`, un `username` ("Invitado-xxxx") y un `token`.
+
+> **Clave de sesión.** Si no defines `TIMEWARP_JWT_SECRET`, el servidor inventa una clave distinta cada vez que arranca: funciona, pero al reiniciarlo las sesiones abiertas dejan de valer y tendrás que volver a pulsar **ENTRAR** en Unity. Para que no pase, define esa variable de entorno con una frase larga y aleatoria (mínimo 32 caracteres). Para jugar tú en local no hace falta.
 
 ## 3. Montar el proyecto Unity (una sola vez)
 
@@ -108,7 +109,8 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 ### Cuenta, mazos y mazo del bot (menú)
 
 * **Invitado:** sin nombre puedes jugar con los mazos de prueba AGGRO y CONTROL.
-* **Cuenta:** escribe un nombre y pulsa **ENTRAR** (si no existe, se crea). Así puedes guardar tus mazos y verlos en la lista **TU MAZO**.
+* **Cuenta:** escribe un nombre y una contraseña (mínimo 8 caracteres). La primera vez pulsa **CREAR CUENTA**; las siguientes, **ENTRAR**. Así puedes guardar tus mazos y verlos en la lista **TU MAZO**. La contraseña se guarda en el servidor cifrada (BCrypt), nunca se almacena en Unity, y tras 5 intentos fallidos seguidos se bloquea unos minutos.
+* Si usas la base en memoria, las cuentas desaparecen al apagar el servidor.
 * **EDITAR MIS MAZOS** abre el editor: catálogo completo (viene de la base de datos) con filtros por facción, tipo y búsqueda. **Clic izquierdo = añadir una copia, clic derecho = quitar una.** A la derecha ves el contador (`27 / 40`), las facciones, la curva de coste y la lista del mazo. Reglas, igual que en el servidor: **exactamente 40 cartas, máximo 3 copias de cada una, máximo 2 facciones**. El botón GUARDAR solo se activa cuando el mazo es válido; si guardas con el nombre de uno existente, lo sustituye (te pide confirmación).
 * **MAZO DEL BOT:** *Aleatorio* (por defecto) genera en cada partida un mazo legal distinto con cartas del catálogo; también puedes forzar AGGRO o CONTROL. El servidor escribe en su consola qué mazo ha elegido el bot (`[BOT] Mazo aleatorio: ...`).
 
@@ -117,7 +119,10 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 | Síntoma | Solución |
 |---|---|
 | Unity: "No se pudo conectar" | El backend no está arrancado o no usa el puerto 8080. |
-| El backend no arranca y menciona `HikariPool`, `Connection` o `postgresql` | Te falta el perfil `demo` (VM option `-Dspring.profiles.active=demo`). |
+| El backend no arranca y menciona `HikariPool`, `Connection` o `postgresql` | Tienes definidas variables `SPRING_DATASOURCE_*` o el perfil `supabase` y Supabase no responde (¿proyecto pausado?). Quítalas para volver a la base en memoria. |
+| Unity: "Esta cuenta se creó antes de que existieran las contraseñas…" | Es una cuenta de la versión sin contraseñas. Crea una cuenta nueva (o mira la nota del punto 6). |
+| Unity: "Demasiados intentos" / 429 | Frenos anti-abuso: espera unos minutos. |
+| Unity: dejó de responder tras reiniciar el servidor | La sesión se firmó con la clave anterior. Vuelve al menú y pulsa **ENTRAR** (o define `TIMEWARP_JWT_SECRET`). |
 | `mvn no se reconoce` | No uses `mvn`: usa `.\\mvnw.cmd` (Camino B) o IntelliJ (Camino A). |
 | Unity: los clics no hacen nada (Unity 6) | *Edit ▸ Project Settings ▸ Player ▸ Other Settings ▸ Active Input Handling = **Both***, y reinicia Unity. |
 | Error de compilación con `ClientWebSocket` | Unity demasiado antiguo: usa 2021.3 LTS+ y *Api Compatibility Level = .NET Standard 2.1*. |
@@ -125,23 +130,26 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 
 > No he podido ejecutar la interfaz dentro de Unity (no tengo Unity en mi entorno). La red y las reglas están probadas con más de 60 partidas contra tu backend y todo el código compila contra la API real de Unity, pero el aspecto visual puede necesitar ajustes.
 
-## 6. Usar tu Supabase de verdad (mazos y cartas guardados en la nube)
+## 6. Usar tu Supabase de verdad (cuentas, mazos y cartas guardados en la nube)
 
-Con el perfil `demo` todo se pierde al cerrar el servidor. Para que cartas y mazos se guarden en Supabase:
+Con la base en memoria todo se pierde al cerrar el servidor. Para que se guarde en Supabase:
 
-1. En el panel de Supabase comprueba que el proyecto **no está pausado** (el plan gratuito pausa los inactivos; pulsa *Restore project*).
-2. Arranca el backend **sin** el perfil `demo` (tu `application.properties` ya apunta a Supabase). La primera vez, Hibernate crea las tablas solo (`ddl-auto=update`).
-3. **Carga las cartas:** en Supabase ▸ *SQL Editor*, pega el contenido de **`docs/supabase/cartas.sql`** y pulsa *Run*. Es repetible: inserta las cartas nuevas y actualiza las existentes sin borrar nada (no rompe mazos ya guardados). Con tu configuración `data.sql` no se ejecuta, por eso este paso es necesario. Sin él, el editor de mazos mostrará el catálogo vacío.
-4. **Seguridad:** ejecuta también `docs/supabase/seguridad_rls.sql` (ver `docs/SEGURIDAD.md`).
-5. Abre Unity, entra con tu nombre, pulsa **EDITAR MIS MAZOS**: deben aparecer las 36 cartas.
+1. En el panel de Supabase comprueba que el proyecto **no está pausado** (el plan gratuito pausa los inactivos; pulsa *Restore project*). Si aún no lo hiciste, **cambia la contraseña de la base de datos** (*Project Settings ▸ Database ▸ Reset database password*): la anterior estuvo en el repo.
+2. **Tus datos de conexión van en un fichero que NO se sube a git:** copia `supabase.env.cmd.example` como `supabase.env.cmd` (en la raíz del repo; está en `.gitignore`) y rellena la URL, el usuario y la contraseña (*Project Settings ▸ Database ▸ Connection string*, modo *Transaction pooler*), y una frase larga para `TIMEWARP_JWT_SECRET`.
+3. Arranca con doble clic en **`arrancar-backend-supabase.cmd`** (carga ese fichero y activa el perfil `supabase`). La primera vez Hibernate crea las tablas solo y añade a `users` la columna `password_hash`.
+4. **Carga las cartas:** en Supabase ▸ *SQL Editor*, pega el contenido de **`docs/supabase/cartas.sql`** y pulsa *Run*. Es repetible: inserta las cartas nuevas y actualiza las existentes sin borrar nada (no rompe mazos ya guardados). Con Supabase `data.sql` no se ejecuta, por eso este paso es necesario. Sin él, el editor de mazos mostrará el catálogo vacío.
+5. **Seguridad (hazlo una vez):** ejecuta `docs/supabase/seguridad_rls.sql` y después `docs/supabase/rol_app.sql` (cambia antes la contraseña que lleva dentro); las instrucciones para usar ese rol están al final del propio fichero. Más detalle en `docs/SEGURIDAD.md`.
+6. Abre Unity, pulsa **CREAR CUENTA** con un nombre y contraseña, y **EDITAR MIS MAZOS**: deben aparecer las 36 cartas.
+
+> **Cuentas antiguas.** Las filas que ya tengas en `users` se crearon cuando solo hacía falta el nombre y no tienen contraseña, así que **nadie puede entrar con ellas** (es lo seguro por defecto: si no, cualquiera podría apropiarse de la cuenta). Crea una cuenta nueva. Si necesitas conservar los mazos de una cuenta antigua, arranca **una sola vez** con `set TIMEWARP_SECURITY_ALLOW_CLAIM_LEGACY_ACCOUNTS=true` en `supabase.env.cmd`, entra tú con ese nombre y una contraseña (la primera que se use queda como definitiva), y quita la línea.
 
 ### Cómo añadir cartas nuevas
 1. Edita `docs/catalogo/cartas.csv` (Excel vale: separador `;`, UTF-8). Las columnas y valores permitidos están explicados en la cabecera de `tools/catalog/generar_sql.py`.
 2. Ejecuta `python tools/catalog/generar_sql.py` (valida el CSV y regenera `data.sql` y `docs/supabase/cartas.sql`).
-3. Pega el nuevo `cartas.sql` en Supabase. Reinicia el backend si usas el perfil `demo`.
+3. Pega el nuevo `cartas.sql` en Supabase. Reinicia el backend si usas la base en memoria.
 
 Hoy hay 36 cartas (4 facciones × 9: 6 unidades y 3 hechizos cada una), con keywords `JUMPER` y `DISRUPTION`, robar cartas, daño, bonificaciones, "gloria" y hechizos lentos/rápidos/instantáneos. Recuerda que solo `JUMPER` y `DISRUPTION` tienen lógica como keywords; el resto de efectos se declaran en la columna `effects`.
 
-## 🔐 Seguridad: la contraseña de Supabase está en el historial de git
+## 🔐 Seguridad
 
-`TimewarpTCG.Back/src/main/resources/application.properties` está versionado en `develop` **con la contraseña en la URL** (desde el commit `456d63c`). Borrarlo ahora no la quita del historial. Si el repo es o ha sido público, **resetea la contraseña** en Supabase (*Project Settings ▸ Database ▸ Reset database password*). Esta rama no toca ese fichero.
+El backend ya incluye cuentas con contraseña cifrada, sesiones firmadas (JWT), comprobación de que cada jugador solo toca sus partidas y sus mazos, límites anti-abuso y errores genéricos. Lo que **solo puedes hacer tú** (cambiar la contraseña de Supabase, que estuvo en el historial de git desde el commit `456d63c`, activar protecciones en GitHub, HTTPS al publicarlo…) está en **`docs/SEGURIDAD.md`**, con un checklist.

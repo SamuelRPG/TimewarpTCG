@@ -28,6 +28,7 @@ static class Program
         int bad = 0;
         if (!SelfTests()) { Console.WriteLine("RESULTADO: FALLAN LAS AUTOPRUEBAS"); return 1; }
         var rnd = new Random(1234);
+        if (deck.Equals("SECURITY", StringComparison.OrdinalIgnoreCase)) return await SecurityChecks(host);
         for (int g = 1; g <= games; g++)
         {
             Result r;
@@ -149,6 +150,14 @@ static class Program
             Check(d2.Load(saved) == 2 && d2.Total == 3 && d2.SavedAs == "Guardado" && d2.Name == "Guardado", "Load omite cartas inexistentes");
         }
 
+        // el cifrado nunca se degrada: https:// => wss://, y http:// o sin esquema => ws://
+        Check(GameConnection.ToWebSocketUrl("https://juego.example.com") == "wss://juego.example.com/timewarp-ws", "https:// debe dar wss://");
+        Check(GameConnection.ToWebSocketUrl("https://juego.example.com/").StartsWith("wss://"), "https:// con barra final debe dar wss://");
+        Check(GameConnection.ToWebSocketUrl("wss://juego.example.com") == "wss://juego.example.com/timewarp-ws", "wss:// se respeta");
+        Check(GameConnection.ToWebSocketUrl("http://localhost:8080") == "ws://localhost:8080/timewarp-ws", "http:// da ws://");
+        Check(GameConnection.ToWebSocketUrl("localhost:8080") == "ws://localhost:8080/timewarp-ws", "sin esquema da ws://");
+        Check(RestApi.ToHttpBase("wss://juego.example.com").StartsWith("https://"), "wss:// debe dar https:// en REST");
+
         Console.WriteLine(fails == 0 ? "autopruebas de lógica: OK" : "autopruebas: " + fails + " fallo(s)");
         return fails == 0;
     }
@@ -156,13 +165,18 @@ static class Program
     static async Task<Result> PlayOne(string host, string deck, Random rnd, string botDeck)
     {
         var res = new Result();
-        string myId = Guid.NewGuid().ToString();
+        string myId, myToken;
         string deckName = deck;
         if (deck.Equals("CUSTOM", StringComparison.OrdinalIgnoreCase))
         {
-            // Flujo real del editor de mazos: registrar usuario, leer catálogo, guardar un mazo legal, jugar con él
+            // Flujo real del editor de mazos: crear cuenta (con contraseña), leer catálogo, guardar un mazo legal, jugar con él
             var made = await MakeCustomDeck(host, rnd, res);
-            myId = made.Item1; deckName = made.Item2;
+            myId = made.Item1; deckName = made.Item2; myToken = made.Item3;
+        }
+        else
+        {
+            var guest = await RestApi.GuestAsync(host);     // invitado: identidad firmada por el servidor
+            myId = guest.id; myToken = guest.token;
         }
         var inbox = new BlockingCollection<object>();
         using (var conn = new GameConnection())
@@ -173,7 +187,7 @@ static class Program
             var cts = new CancellationTokenSource();
             var pump = Task.Run(async () => { while (!cts.IsCancellationRequested) { conn.Pump(); await Task.Delay(3); } });
 
-            await conn.ConnectAsync(host, myId);
+            await conn.ConnectAsync(host, myId, myToken);
             conn.StartLocalMatch(deckName, botDeck);
 
             GameStateDto prev = null, s = (GameStateDto)await Next(inbox);
@@ -224,6 +238,7 @@ static class Program
                 if (pick != null && (kind == "play" || kind == "cast")) hint = GameRules.PlayHint(s, pick, pending);
                 if (pick != null && kind == "move") hint = GameRules.MoveHint(s, pick);
 
+                await Task.Delay(55);   // ritmo de un jugador muy rapido (~18 acciones/s): el servidor limita las rafagas
                 switch (kind)
                 {
                     case "play": case "cast":
@@ -291,9 +306,10 @@ static class Program
 
     static bool Satisfiable(GameStateDto s, CardDto c) { return PickTargets(s, c).Count == GameRules.TotalTargets(c); }
 
-    static async Task<Tuple<string, string>> MakeCustomDeck(string host, Random rnd, Result res)
+    static async Task<Tuple<string, string, string>> MakeCustomDeck(string host, Random rnd, Result res)
     {
-        var user = await RestApi.LoginOrRegisterAsync(host, "smoke_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        var user = await RestApi.RegisterAsync(host, "smoke_" + Guid.NewGuid().ToString("N").Substring(0, 8), "contraseña-de-prueba-" + rnd.Next(100000));
+        RestApi.Token = user.token;
         var cards = await RestApi.GetCardsAsync(host);
         var factions = cards.Select(c => c.faction).Distinct().OrderBy(x => rnd.Next()).Take(2).ToList();
         var pool = cards.Where(c => factions.Contains(c.faction)).ToList();
@@ -322,11 +338,131 @@ static class Program
         var entries = counts.Select(kv => new DeckEntryDto { cardId = kv.Key, quantity = kv.Value }).ToList();
         if (entries.Sum(e => e.quantity) != 40) throw new Exception("el agente no pudo montar un mazo de 40");
         string name = "Smoke " + string.Join("+", factions.Select(f => f.Substring(0, 3)));
-        var saved = await RestApi.SaveDeckAsync(host, user.id, name, entries);
-        var listed = await RestApi.GetDecksAsync(host, user.id);
+        var saved = await RestApi.SaveDeckAsync(host, name, entries);
+        var listed = await RestApi.GetDecksAsync(host);
         if (saved.total != 40 || !listed.Any(d => d.name == name && d.total == 40)) throw new Exception("el mazo guardado no aparece en la lista");
         res.DeckInfo = "[mazo " + name + ": " + pool.Where(c => c.cardType == "SPELL" && counts.ContainsKey(c.id)).Sum(c => counts[c.id]) + " hechizos de 40]";
-        return Tuple.Create(user.id, name);
+        return Tuple.Create(user.id, name, user.token);
+    }
+
+    // ------------------------------------------------------------------ ataques de prueba contra el servidor real
+    static async Task<int> SecurityChecks(string host)
+    {
+        int fails = 0;
+        void Check(bool ok, string what) { Console.WriteLine((ok ? "  [OK]    " : "  [FALLO] ") + what); if (!ok) fails++; }
+        string http = RestApi.ToHttpBase(host);
+        var hc = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        async Task<int> Status(System.Net.Http.HttpMethod m, string path, string token, string json = null)
+        {
+            var req = new System.Net.Http.HttpRequestMessage(m, http + path);
+            if (token != null) req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
+            if (json != null) req.Content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            return (int)(await hc.SendAsync(req)).StatusCode;
+        }
+        var get = System.Net.Http.HttpMethod.Get; var post = System.Net.Http.HttpMethod.Post; var del = System.Net.Http.HttpMethod.Delete;
+        var stompField = typeof(GameConnection).GetField("_stomp", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        Console.WriteLine("REST");
+        Check(await Status(get, "/api/menu/decks", null) == 401, "mazos sin token -> 401");
+        Check(await Status(get, "/api/menu/decks?userId=" + Guid.NewGuid(), null) == 401, "formato antiguo (userId en la URL) sin token -> 401");
+        Check(await Status(get, "/api/menu/decks", "token.falso.aqui") == 401, "token falso -> 401");
+        Check(await Status(del, "/api/users/" + Guid.NewGuid(), null) != 200, "DELETE /api/users/{id} (antiguo, sin autenticar) ya no borra cuentas");
+        Check(await Status(post, "/api/users/login?username=x&password=y", null, "{}") != 200, "login por parametros de URL ya no existe");
+
+        var a = await RestApi.RegisterAsync(host, "sec_a_" + Guid.NewGuid().ToString("N").Substring(0, 8), "contraseña-segura-A1");
+        var b = await RestApi.RegisterAsync(host, "sec_b_" + Guid.NewGuid().ToString("N").Substring(0, 8), "contraseña-segura-B2");
+        var g = await RestApi.GuestAsync(host);
+        Check(await Status(get, "/api/menu/decks", a.token) == 200, "mazos con token propio -> 200");
+
+        Console.WriteLine("WEBSOCKET");
+        try { using (var c = new GameConnection()) { await c.ConnectAsync(host, a.id, ""); Check(false, "CONNECT sin token debe fallar"); } }
+        catch (Exception) { Check(true, "CONNECT sin token -> rechazado"); }
+        try { using (var c = new GameConnection()) { await c.ConnectAsync(host, a.id, "eyJhbGciOiJIUzI1NiJ9.e30.firmafalsa"); Check(false, "CONNECT con token falso debe fallar"); } }
+        catch (Exception) { Check(true, "CONNECT con token falso -> rechazado"); }
+
+        // espiar el canal de otro jugador: la suscripcion se rechaza y el servidor cierra la sesion
+        {
+            var closed = new TaskCompletionSource<string>();
+            var stomp = new StompClient();
+            stomp.Closed += r => closed.TrySetResult(r);
+            await stomp.ConnectAsync(GameConnection.ToWebSocketUrl(host), a.token);
+            var pump = Task.Run(async () => { while (!closed.Task.IsCompleted) { stomp.Pump(); await Task.Delay(5); } });
+            try { await stomp.SubscribeAsync("/topic/player/" + b.id, s => { }, 100); } catch (Exception) { }
+            var done = await Task.WhenAny(closed.Task, Task.Delay(3000));
+            Check(done == closed.Task, "suscribirse al canal de OTRO jugador -> el servidor corta la sesion");
+            stomp.Dispose();
+        }
+
+        // suplantar: A manda startLocalMatch diciendo ser B
+        using (var ca = new GameConnection())
+        {
+            var gotState = new TaskCompletionSource<bool>(); var gotError = new TaskCompletionSource<string>();
+            ca.StateReceived += st => gotState.TrySetResult(true);
+            ca.ErrorReceived += e => gotError.TrySetResult(e);
+            await ca.ConnectAsync(host, a.id, a.token);
+            var pump = Task.Run(async () => { for (int i = 0; i < 600; i++) { ca.Pump(); await Task.Delay(5); } });
+            var stompA = (StompClient)stompField.GetValue(ca);
+            await stompA.SendAsync("/app/game/startLocalMatch", Json.ToJson(new StartMatchRequest { playerId = b.id, deckName = "AGGRO", botDeck = "AGGRO" }));
+            var first = await Task.WhenAny(gotError.Task, gotState.Task, Task.Delay(3000));
+            Check(first == gotError.Task && gotError.Task.Result.Contains("no coincide"), "startLocalMatch con el playerId de OTRO -> error 'no coincide' (" + (first == gotError.Task ? gotError.Task.Result : "sin error") + ")");
+            Check(!gotState.Task.IsCompleted, "y no se crea ninguna partida a nombre de otro");
+        }
+
+        // B juega una partida; A intenta pasar prioridad en la partida de B
+        using (var cb = new GameConnection())
+        using (var ca = new GameConnection())
+        {
+            var bState = new TaskCompletionSource<GameStateDto>(); int bStates = 0;
+            cb.StateReceived += st => { bStates++; bState.TrySetResult(st); };
+            var aError = new TaskCompletionSource<string>(); var aState = new TaskCompletionSource<bool>();
+            ca.ErrorReceived += e => aError.TrySetResult(e);
+            ca.StateReceived += st => aState.TrySetResult(true);
+            await cb.ConnectAsync(host, b.id, b.token);
+            await ca.ConnectAsync(host, a.id, a.token);
+            var pump = Task.Run(async () => { for (int i = 0; i < 800; i++) { cb.Pump(); ca.Pump(); await Task.Delay(5); } });
+            cb.StartLocalMatch("AGGRO", "AGGRO");
+            var st0 = await Task.WhenAny(bState.Task, Task.Delay(4000)) == bState.Task ? bState.Task.Result : null;
+            Check(st0 != null, "B inicia su partida");
+            if (st0 != null)
+            {
+                int before = bStates;
+                var stompA = (StompClient)stompField.GetValue(ca);
+                await stompA.SendAsync("/app/game/passPriority", Json.ToJson(new PassPriorityRequest { gameId = st0.gameStateId, playerId = a.id }));
+                var r = await Task.WhenAny(aError.Task, Task.Delay(3000));
+                Check(r == aError.Task, "A actuando en la partida de B -> error (" + (r == aError.Task ? aError.Task.Result : "sin respuesta") + ")");
+                await Task.Delay(300);
+                Check(bStates == before, "la partida de B no cambia");
+                Check(!aState.Task.IsCompleted, "A no recibe el estado de la partida de B");
+            }
+        }
+
+        // invitado: solo mazos de prueba
+        using (var cg = new GameConnection())
+        {
+            var err = new TaskCompletionSource<string>(); var st = new TaskCompletionSource<bool>();
+            cg.ErrorReceived += e => err.TrySetResult(e); cg.StateReceived += s2 => st.TrySetResult(true);
+            await cg.ConnectAsync(host, g.id, g.token);
+            var pump = Task.Run(async () => { for (int i = 0; i < 400; i++) { cg.Pump(); await Task.Delay(5); } });
+            cg.StartLocalMatch("MiMazoInventado", "AGGRO");
+            var r = await Task.WhenAny(err.Task, st.Task, Task.Delay(3000));
+            Check(r == err.Task, "invitado con un mazo propio -> rechazado");
+        }
+
+        // inundacion de mensajes: el servidor corta la sesion
+        {
+            var closed = new TaskCompletionSource<string>();
+            var stomp = new StompClient();
+            stomp.Closed += r => closed.TrySetResult(r);
+            await stomp.ConnectAsync(GameConnection.ToWebSocketUrl(host), a.token);
+            var pump = Task.Run(async () => { while (!closed.Task.IsCompleted) { stomp.Pump(); await Task.Delay(5); } });
+            try { for (int i = 0; i < 400; i++) await stomp.SendAsync("/app/game/passPriority", "{}"); } catch (Exception) { }
+            var done = await Task.WhenAny(closed.Task, Task.Delay(4000));
+            Check(done == closed.Task, "inundar con 400 mensajes en un instante -> sesion cortada");
+            stomp.Dispose();
+        }
+
+        Console.WriteLine(fails == 0 ? "SEGURIDAD: TODO OK" : "SEGURIDAD: " + fails + " comprobacion(es) FALLAN");
+        return fails == 0 ? 0 : 1;
     }
 
     static async Task<object> Next(BlockingCollection<object> inbox)
