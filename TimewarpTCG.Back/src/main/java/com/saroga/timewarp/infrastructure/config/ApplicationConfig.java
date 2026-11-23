@@ -25,8 +25,16 @@ public class ApplicationConfig {
 
     // <-- AHORA INYECTAMOS DeckRepositoryPort AQUÍ
     @Bean
-    public StartMatchUseCase startMatchUseCase(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory, BotDeckService botDeckService) {
-        return new StartMatchService(deckRepositoryPort, deckFactory, botDeckService);
+    public StartMatchUseCase startMatchUseCase(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory, BotDeckService botDeckService,
+                                               DeckValidatorService deckValidatorService) {
+        return new StartMatchService(deckRepositoryPort, deckFactory, botDeckService, deckValidatorService);
+    }
+
+    /** Cola de "partida rapida" contra otra persona. Quien espera mas de timewarp.pvp.queue-minutes sale de la cola. */
+    @Bean
+    public com.saroga.timewarp.application.service.Matchmaking.MatchmakingService matchmakingService(
+            @org.springframework.beans.factory.annotation.Value("${timewarp.pvp.queue-minutes:5}") long queueMinutes) {
+        return new com.saroga.timewarp.application.service.Matchmaking.MatchmakingService(queueMinutes * 60_000L);
     }
 
     @Bean

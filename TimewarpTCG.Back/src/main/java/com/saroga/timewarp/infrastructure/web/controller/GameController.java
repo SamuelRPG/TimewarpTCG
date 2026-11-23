@@ -5,7 +5,6 @@ import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PassPriority
 import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PlayCard.PlayCardUseCase;
 import com.saroga.timewarp.application.ports.in.StartMatch.StartMatchUseCase;
 import com.saroga.timewarp.application.ports.out.GameRepository.GameRepositoryPort;
-import com.saroga.timewarp.application.service.BotBrain.BotBrainService;
 import com.saroga.timewarp.domain.model.entity.card.Card;
 import com.saroga.timewarp.domain.model.entity.gameState.GameState;
 import com.saroga.timewarp.domain.model.enums.CardLocation;
@@ -15,12 +14,10 @@ import com.saroga.timewarp.infrastructure.web.dto.request.MoveCardRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.request.PassPriorityRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.request.PlayCardRequestDto;
 import com.saroga.timewarp.infrastructure.web.dto.request.StartMatchRequestDto;
-import com.saroga.timewarp.infrastructure.web.dto.response.ErrorResponseDto;
-import com.saroga.timewarp.infrastructure.web.dto.response.GameStateDto;
-import com.saroga.timewarp.infrastructure.web.mapper.GameStateMapper;
+import com.saroga.timewarp.infrastructure.web.GameFlow;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
@@ -37,26 +34,22 @@ import java.util.stream.Collectors;
 @MessageMapping("/game")
 public class GameController {
 
-    private static final String PLAYER_TOPIC_TEMPLATE = "/topic/player/%s";
     private final MoveCardUseCase moveCardUseCase;
     private final PassPriorityUseCase passPriorityUseCase;
     private final PlayCardUseCase playCardUseCase;
-    private final BotBrainService botBrainService;
     private final StartMatchUseCase startMatchUseCase;
     private final GameRepositoryPort gameRepository;
-    private final SimpMessagingTemplate simpMessagingTemplate;
+    private final GameFlow flow;
 
-    public GameController ( MoveCardUseCase moveCardUseCase, PassPriorityUseCase passPriorityUseCase,
-                            PlayCardUseCase playCardUseCase, BotBrainService botBrainService,
-                            StartMatchUseCase startMatchUseCase, GameRepositoryPort gameRepository,
-                            SimpMessagingTemplate simpMessagingTemplate) {
+    public GameController(MoveCardUseCase moveCardUseCase, PassPriorityUseCase passPriorityUseCase,
+                          PlayCardUseCase playCardUseCase, StartMatchUseCase startMatchUseCase,
+                          GameRepositoryPort gameRepository, GameFlow flow) {
         this.moveCardUseCase = moveCardUseCase;
         this.passPriorityUseCase = passPriorityUseCase;
         this.playCardUseCase = playCardUseCase;
-        this.botBrainService = botBrainService;
         this.startMatchUseCase = startMatchUseCase;
         this.gameRepository = gameRepository;
-        this.simpMessagingTemplate = simpMessagingTemplate;
+        this.flow = flow;
     }
 
     @MessageMapping("/playCard")
@@ -116,7 +109,7 @@ public class GameController {
     }
 
     @MessageMapping("/startLocalMatch")
-    public void startMatch(@Payload StartMatchRequestDto request, Principal principal) {
+    public void startMatch(@Payload StartMatchRequestDto request, Principal principal, @Header("simpSessionId") String sessionId) {
         UUID pid = authenticated(principal);
         if (pid == null) return;
         try {
@@ -126,7 +119,8 @@ public class GameController {
             if (principal instanceof AuthPrincipal && ((AuthPrincipal) principal).guest() && !builtin) {
                 throw new IllegalArgumentException("Los invitados solo pueden jugar con AGGRO o CONTROL. Inicia sesión para usar tus mazos.");
             }
-            gameRepository.deleteByPlayerId(pid);          // solo una partida activa por jugador
+            flow.leaveCurrentGame(pid);                    // solo una partida activa por jugador (si seguias en una online, la pierdes)
+            flow.bindSession(pid, sessionId);
             GameState game = startMatchUseCase.executeLocalMatch(pid, deck, request.botDeck);
             synchronized (game) {
                 processGameUpdate(game);
@@ -175,50 +169,8 @@ public class GameController {
         }
     }
 
-    // --- HELPER DEFLUJO Y LIMPIEZA DE RAM ---
-    private void processGameUpdate(GameState game) {
-        // 1. Si el humano ganó con su última acción
-        if (game.getGameStatus() == GameStatus.FINISHED) {
-            broadcastGame(game);
-            gameRepository.delete(game.getGameId());
-            return;
-        }
+    // --- el flujo comun (guardar, avisar a los jugadores, pasos del bot, limpieza) vive en GameFlow ---
+    private void processGameUpdate(GameState game) { flow.afterAction(game); }
 
-        // 2. Si la partida sigue, guardamos y ejecutamos IA
-        gameRepository.save(game);
-        checkBotTurn(game);
-        broadcastGame(game);
-
-        // 3. Si el bot ganó en su turno, borramos también
-        if (game.getGameStatus() == GameStatus.FINISHED) {
-            gameRepository.delete(game.getGameId());
-        }
-    }
-
-    private void checkBotTurn(GameState game) {
-        // Tope de seguridad: si el bot no avanza la partida jamas cuelga el servidor en un bucle infinito
-        int guard = 0;
-        while (game.getPlayerById(game.getActivePlayerId()).isBot() && game.getGameStatus() != GameStatus.FINISHED && guard++ < 500) {
-            botBrainService.takeTurn(game);
-            gameRepository.save(game);
-        }
-    }
-
-    private void broadcastGame(GameState game) {
-        sendToPlayer(game, game.getPlayerA().getPlayerId());
-        sendToPlayer(game, game.getPlayerB().getPlayerId());
-    }
-
-    private void sendToPlayer(GameState game, UUID playerId) {
-        GameStateDto dto = GameStateMapper.toGameStateDto(game, playerId);
-        // Ahora solo formateamos con el playerId
-        String destination = String.format(PLAYER_TOPIC_TEMPLATE, playerId);
-        simpMessagingTemplate.convertAndSend(destination, dto);
-    }
-
-    private void sendErrorToPlayer(UUID playerId, String errorMessage) {
-        ErrorResponseDto errorDto = new ErrorResponseDto(errorMessage);
-        String errorDestination = "/topic/player/" + playerId + "/errors";
-        simpMessagingTemplate.convertAndSend(errorDestination, errorDto);
-    }
+    private void sendErrorToPlayer(UUID playerId, String errorMessage) { flow.sendError(playerId, errorMessage); }
 }

@@ -60,6 +60,13 @@ public class InMemoryGameRepository implements GameRepositoryPort {
     }
 
     @Override
+    public java.util.Optional<GameState> findByPlayerId(UUID playerId) {
+        return storage.values().stream()
+                .filter(g -> g.getPlayerA().getPlayerId().equals(playerId) || g.getPlayerB().getPlayerId().equals(playerId))
+                .findFirst();
+    }
+
+    @Override
     public void deleteByPlayerId(UUID playerId) {
         storage.entrySet().removeIf(e -> {
             GameState g = e.getValue();

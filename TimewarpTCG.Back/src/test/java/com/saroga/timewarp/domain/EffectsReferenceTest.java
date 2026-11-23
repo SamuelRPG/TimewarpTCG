@@ -230,4 +230,85 @@ public class EffectsReferenceTest {
         assertEquals(5 - 2 + 2, mummy.getDrive().value());
         assertTrue(loser.isDestroyed(), "el perdedor muere y no recibe su ON_COMBAT_WIN");
     }
+
+    // ------------------------------------------------------------------ combinaciones de las cartas nuevas del catalogo
+
+    private void fillDeck(PlayerState owner, int n) {
+        for (int i = 0; i < n; i++) {
+            Card c = Card.createUnit(owner.getPlayerId(), "Relleno", "", Drive.of(1), Cost.of(1), List.of(), List.of(), List.of(), Faction.ROMANS);
+            c.setCardLocation(CardLocation.DECK);
+            owner.getDeck().add(c);
+        }
+    }
+
+    @Test
+    void onDestroyedDraw_theOwnerDrawsWhenItDies() {
+        fillDeck(pA, 5);
+        Card golem = onBoard(pA, a, 6, CardLocation.FIELD_LEFT, "ON_DAMAGE_TAKEN:SELF_BUFF:2;ON_DESTROYED:DRAW:2", "NONE");
+        golem.takeDamage(game, Drive.of(1));                       // sobrevive: +2 y no roba
+        assertEquals(7, golem.getDrive().value());
+        assertEquals(0, pA.getHand().size());
+        golem.takeDamage(game, Drive.of(99));                      // muere: roba 2 (y no se cura con el daño letal)
+        assertTrue(golem.isDestroyed());
+        assertEquals(2, pA.getHand().size());
+        assertEquals(3, pA.getDeck().size());
+    }
+
+    @Test
+    void onCombatWinDraw_onlyTheWinnerDraws() {
+        fillDeck(pA, 3); fillDeck(pB, 3);
+        onBoard(pA, a, 5, CardLocation.FIELD_LEFT, "ON_COMBAT_WIN:DRAW:1;ON_COMBAT_WIN:SELF_BUFF:1", "NONE");
+        onBoard(pB, b, 2, CardLocation.FIELD_LEFT, "ON_COMBAT_WIN:DRAW:1", "NONE");
+        combat.resolveLaneCombat(game, CardLocation.FIELD_LEFT);
+        assertEquals(1, pA.getHand().size(), "gana el combate: roba");
+        assertEquals(0, pB.getHand().size(), "pierde: no roba");
+    }
+
+    @Test
+    void onDamageTakenReadyAndDraw_whenItSurvives() {
+        fillDeck(pA, 3);
+        Card praetorian = onBoard(pA, a, 5, CardLocation.FIELD_LEFT, "ON_DAMAGE_TAKEN:SELF_BUFF:1;ON_DAMAGE_TAKEN:READY_SELF;ON_DAMAGE_TAKEN:DRAW:1", "NONE");
+        praetorian.exhaust();
+        praetorian.takeDamage(game, Drive.of(2));
+        assertFalse(praetorian.isExhausted(), "se recupera al sobrevivir al daño");
+        assertEquals(4, praetorian.getDrive().value(), "5 - 2 + 1");
+        assertEquals(1, pA.getHand().size());
+    }
+
+    @Test
+    void onMovementConfirmedDraw_drawsWheneverTheMoveIsConfirmed() {
+        fillDeck(pA, 3);
+        Card scout = onBoard(pA, a, 1, CardLocation.FIELD_LEFT, "ON_MOVEMENT_CONFIRMED:DRAW:1", "NONE", Keyword.JUMPER);
+        scout.onMovementConfirmed(game, pA, pB, CardLocation.FIELD_LEFT);
+        assertEquals(1, pA.getHand().size());
+    }
+
+    @Test
+    void spellWithTwoTargetGroups_eachEffectHitsItsOwnTarget() {
+        Card enemy = onBoard(pB, b, 6, CardLocation.FIELD_LEFT, "NONE", "NONE");
+        Card ally = onBoard(pA, a, 3, CardLocation.MY_BASE, "NONE", "NONE");
+        Card judgement = spellInHand(pA, SpellSpeed.INSTANT, "ON_PLACED:ENEMY_DAMAGE:3;ON_PLACED:ALLY_BOOST:3", "1:ENEMY;1:ALLY");
+
+        Card enemy2 = onBoard(pB, b, 6, CardLocation.FIELD_RIGHT, "NONE", "NONE");
+        assertThrows(IllegalStateException.class, () -> play.executePlay(game, a, judgement, CardLocation.MY_BASE, List.of(enemy, enemy2)),
+                "dos enemigos no valen: pide uno enemigo y uno aliado");
+        assertEquals(6, enemy.getDrive().value());
+
+        play.executePlay(game, a, judgement, CardLocation.MY_BASE, List.of(enemy, ally));
+        assertEquals(3, enemy.getDrive().value(), "el enemigo recibe el daño");
+        assertEquals(6, ally.getDrive().value(), "el aliado recibe el refuerzo");
+        assertEquals(6, enemy2.getDrive().value(), "y nadie más");
+    }
+
+    @Test
+    void unitWithThreeOnPlacedEffects_resolvesAllOfThem() {
+        fillDeck(pA, 3);
+        Card enemy = onBoard(pB, b, 6, CardLocation.FIELD_LEFT, "NONE", "NONE");
+        Card ally = onBoard(pA, a, 3, CardLocation.MY_BASE, "NONE", "NONE");
+        Card consul = inHand(pA, a, 6, "ON_PLACED:ENEMY_DAMAGE:3;ON_PLACED:ALLY_BOOST:3;ON_PLACED:DRAW:1", "1:ENEMY;1:ALLY");
+        play.executePlay(game, a, consul, CardLocation.MY_BASE, List.of(enemy, ally));
+        assertEquals(3, enemy.getDrive().value());
+        assertEquals(6, ally.getDrive().value());
+        assertEquals(2, pA.getDeck().size(), "ha robado una carta");
+    }
 }

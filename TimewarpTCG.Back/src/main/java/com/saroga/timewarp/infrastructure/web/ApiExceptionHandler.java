@@ -25,6 +25,15 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", "Petición mal formada."));
     }
 
+    /** Fallo de acceso a datos que no es de integridad (columna que falta, sin permisos, base caida...): se explica sin dar detalles internos. */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<?> database(org.springframework.dao.DataAccessException e) {
+        System.err.println("[ERROR] Fallo de base de datos: " + e.getMostSpecificCause().getMessage());
+        e.printStackTrace();
+        return ResponseEntity.status(503).body(Map.of("error",
+                "Error de base de datos. Mira la consola del backend: si falta la columna 'password_hash', ejecuta docs/supabase/anadir_password_hash.sql."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> unexpected(Exception e) {
         // errores "normales" de Spring (404, 405, 400 por parametro que falta...): conservan su codigo, con mensaje generico

@@ -300,4 +300,11 @@ public class GameState {
 
     public GameStatus getGameStatus() { return gameStatus;}
     public UUID getWinnerId() { return winnerId; }
+
+    /** Un jugador abandona, se desconecta o se queda sin tiempo: la partida termina y gana el rival. No hace nada si ya acabo. */
+    public void concede(UUID loserId) {
+        if (this.gameStatus == GameStatus.FINISHED) return;
+        this.winnerId = getOpponentOf(loserId).getPlayerId();
+        this.gameStatus = GameStatus.FINISHED;
+    }
 }

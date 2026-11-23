@@ -70,7 +70,10 @@ public class UserController {
             UserEntity user = userRepository.save(new UserEntity(username, encoder.encode(password)));
             return ResponseEntity.ok(session(user.getId(), user.getUsername(), false));
         } catch (DataIntegrityViolationException e) {
-            return error(409, "El nombre de usuario ya está en uso.");
+            // solo es "nombre repetido" si lo es de verdad (carrera entre dos registros); cualquier otra restriccion se cuenta aparte
+            if (userRepository.findByUsernameIgnoreCase(username).isPresent()) return error(409, "El nombre de usuario ya está en uso.");
+            System.err.println("[ERROR] Registro rechazado por la base de datos: " + e.getMostSpecificCause().getMessage());
+            return error(500, "No se pudo guardar la cuenta por una restricción de la base de datos. Mira la consola del backend.");
         }
     }
 

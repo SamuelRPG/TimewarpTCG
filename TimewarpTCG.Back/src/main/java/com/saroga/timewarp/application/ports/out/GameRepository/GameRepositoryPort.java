@@ -10,4 +10,7 @@ public interface GameRepositoryPort {
     void delete(UUID gameId);
     /** Borra las partidas en las que participa el jugador (solo se permite una partida activa por jugador). */
     void deleteByPlayerId(UUID playerId);
+
+    /** La partida activa del jugador, si tiene alguna. */
+    java.util.Optional<GameState> findByPlayerId(UUID playerId);
 }

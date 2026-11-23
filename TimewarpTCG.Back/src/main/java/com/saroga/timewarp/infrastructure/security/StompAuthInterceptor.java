@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  */
 public class StompAuthInterceptor implements ChannelInterceptor {
 
-    private static final Pattern PLAYER_TOPIC = Pattern.compile("^/topic/player/([0-9a-fA-F\\-]{36})(/errors)?$");
+    private static final Pattern PLAYER_TOPIC = Pattern.compile("^/topic/player/([0-9a-fA-F\\-]{36})(/errors|/status)?$");
 
     private final JwtService jwt;
     private final RateLimiter limiter;
