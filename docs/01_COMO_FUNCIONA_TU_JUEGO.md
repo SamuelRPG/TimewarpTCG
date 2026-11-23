@@ -63,7 +63,7 @@ Solo actúa el jugador con la **prioridad** (`GameFlowService`). Hay una cuenta 
 * Dispara su efecto `ON_PLACED` (si lo tiene) con los objetivos elegidos.
 
 ### Mover unidades (`PlayerState.moveCard`, `GameFlowService`)
-* Requiere tener la prioridad (en cualquier fase). La unidad no puede estar agotada.
+* Requiere tener la prioridad **y la fase abierta**: con algo en la **pila** (fases `MAIN_CLOSED` / `COMBAT_CLOSED`) **no se puede mover**; solo responder con hechizos `FAST`/`INSTANT` o pasar. (Antes no se comprobaba y el rival podía mover y confirmar mientras un hechizo esperaba.) La unidad no puede estar agotada.
 * Base ⇄ carril siempre; **carril → carril solo con la keyword JUMPER**. Máx. 6 en destino.
 * El movimiento **no se ejecuta hasta que pasas prioridad** (“confirmar”). Mientras tienes movimientos pendientes **no puedes jugar cartas**. Puedes deshacer un movimiento devolviendo la unidad a su sitio, pero **sigue contando como pendiente** hasta que pases prioridad.
 * Al confirmar: cada unidad movida queda **agotada**, se dispara `ON_MOVEMENT_CONFIRMED`, y si algún carril queda disputado la fase pasa a `COMBAT_OPEN`. La prioridad pasa al rival.
@@ -82,6 +82,14 @@ Por cada carril disputado (izquierdo, luego derecho):
 | `INSTANT` | Cuando quieras | Se resuelve **al momento** (no usa la pila) |
 
 La pila se resuelve **de arriba abajo** (el último lanzado, primero) cuando los dos pasáis seguidos. Los objetivos se validan por grupo: `ALLY`, `ENEMY`, `ANY_UNIT` y el número exacto que pide la carta.
+
+#### Los efectos "al entrar en juego" también usan la pila
+Cuando bajas una **unidad con un efecto `ON_PLACED`** (por ejemplo "da +2 de Drive a un aliado"), la unidad entra **al tablero al momento**, pero su **efecto va a la pila** como una entrada más: la fase pasa a `MAIN_CLOSED`, el rival recibe la prioridad y puede **responder con hechizos `FAST`/`INSTANT`** (por ejemplo, matar al aliado objetivo). El efecto ocurre cuando los dos pasáis seguidos.
+* Si el efecto **no haría nada** (necesita objetivo y no hay ninguno), **no se abre pila**: la unidad entra y la prioridad pasa al rival como siempre.
+* Una unidad **sin** efecto al entrar tampoco usa la pila.
+* Si la unidad muere en respuesta, el efecto **se resuelve igualmente** (ya estaba en la pila).
+* Resolver el efecto **no manda la unidad al cementerio** (a diferencia de un hechizo).
+* Siguen siendo **inmediatos** los demás disparadores: al morir, al sobrevivir a un daño, al ganar un combate y al confirmar un movimiento.
 
 ## 4. Cartas, keywords y efectos
 

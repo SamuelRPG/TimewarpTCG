@@ -11,7 +11,7 @@ static class Program
 {
     class Result
     {
-        public string Outcome; public int BotSteps, Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant, Casts, TargetedCasts, MaxStack;
+        public string Outcome; public int StackMoveProbes, TriggersSeen, BotSteps, Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant, Casts, TargetedCasts, MaxStack;
         public string DeckInfo = "";
         public string Score; public List<string> Problems = new List<string>();
     }
@@ -37,8 +37,8 @@ static class Program
             catch (Exception e) { r = new Result { Outcome = "EXCEPCION", Score = "-" }; r.Problems.Add(e.ToString()); }
             bool fail = r.Outcome != "GAMEOVER" && r.Outcome != "STALLED" || r.Problems.Count > 0 || r.Invariant > 0;
             if (fail) bad++;
-            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10} hechizos={11}(conObjetivo={12}) pilaMax={13} pasosBot={14} {15}",
-                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant, r.Casts, r.TargetedCasts, r.MaxStack, r.BotSteps, r.DeckInfo);
+            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10} hechizos={11}(conObjetivo={12}) pilaMax={13} pasosBot={14} efectosEnPila={15} movsRechazadosConPila={16} {17}",
+                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant, r.Casts, r.TargetedCasts, r.MaxStack, r.BotSteps, r.TriggersSeen, r.StackMoveProbes, r.DeckInfo);
             foreach (var p in r.Problems.Take(6)) Console.WriteLine("      ! " + p);
         }
         Console.WriteLine(bad == 0 ? "RESULTADO: OK" : "RESULTADO: " + bad + " partida(s) con problemas");
@@ -238,7 +238,13 @@ static class Program
 
                 // 1 de cada 8 pasos, intentar algo que la pista marca como ilegal para medir la fidelidad de las pistas
                 bool probe = false;
-                if (rnd.Next(8) == 0)
+                // con la PILA ocupada mover esta prohibido (solo responder con FAST/INSTANT o pasar): se prueba siempre que ocurra
+                var readyOnBase = GameRules.StackClosesPhase(s) ? GameRules.CardsIn(me, Zone.Base).FirstOrDefault(c => !c.isExhausted) : null;
+                if (readyOnBase != null && rnd.Next(2) == 0)
+                {
+                    kind = "move"; pick = readyOnBase; dest = Zone.Left; probe = true; res.StackMoveProbes++;
+                }
+                else if (rnd.Next(8) == 0)
                 {
                     var bad = me.hand.FirstOrDefault(c => GameRules.IsUnit(c) && GameRules.PlayHint(s, c, pending) != null && c.currentCost > me.resource)
                               ?? me.hand.FirstOrDefault(c => GameRules.IsUnit(c) && s.gamePhase != "MAIN_OPEN" && c.currentCost <= me.resource);
@@ -282,6 +288,7 @@ static class Program
 
                 prev = s; s = ns;
                 if (s.spellStack != null && s.spellStack.Count > res.MaxStack) res.MaxStack = s.spellStack.Count;
+                if (s.spellStack != null) foreach (var se in s.spellStack) if (se.kind == "TRIGGER") { res.TriggersSeen++; break; }
                 { var dl = StateDiff.Describe(prev, s); res.DiffLines += dl.Count; if (Verbose) { Console.WriteLine("   [" + kind + (pick != null ? " " + pick.name : "") + "] fase=" + s.gamePhase + " mano=" + string.Join(",", s.activePlayer.hand.Select(c => (c.cardType == "SPELL" ? "*" : "") + c.name.Substring(0, 4) + c.currentCost + (c.spellSpeed ?? "").Substring(0, 1)))); foreach (var l in dl) Console.WriteLine("      " + System.Text.RegularExpressions.Regex.Replace(l, "<[^>]+>", "")); } }
                 CheckInvariants(s, res);
                 if (probe && hint == null) { /* no debería ocurrir */ }

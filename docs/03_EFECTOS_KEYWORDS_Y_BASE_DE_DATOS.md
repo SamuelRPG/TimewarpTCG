@@ -75,7 +75,7 @@ Varios efectos en la misma carta se separan con **`;`**: `ON_DAMAGE_TAKEN:SELF_B
 
 | Disparador | Se dispara… | Objetivos | Ejemplo |
 |---|---|---|---|
-| `ON_PLACED` | **Unidad:** al bajarla de la mano. **Hechizo:** cuando **se resuelve** (en el momento si es `INSTANT`; si es `FAST`/`SLOW`, cuando se vacía la pila) | **Sí**: los elegidos en `targets` | `ON_PLACED:ENEMY_DAMAGE:2` |
+| `ON_PLACED` | **Unidad:** al bajarla de la mano; el efecto **va a la pila** y ocurre cuando los dos pasáis seguidos (el rival puede responder con FAST/INSTANT; si no haría nada, no se abre pila). **Hechizo:** cuando **se resuelve** (en el momento si es `INSTANT`; si es `FAST`/`SLOW`, cuando se vacía la pila) | **Sí**: los elegidos en `targets` | `ON_PLACED:ENEMY_DAMAGE:2` |
 | `ON_COMBAT_WIN` | La unidad **gana** un combate en su carril (sumó más Drive que el rival; un empate no cuenta). Solo las unidades **que siguen vivas** | No | `ON_COMBAT_WIN:SELF_BUFF:2` |
 | `ON_DAMAGE_TAKEN` | La unidad recibe daño **y sobrevive** | No | `ON_DAMAGE_TAKEN:SELF_BUFF:1` |
 | `ON_DESTROYED` | La unidad es destruida | No | (ninguna carta del catálogo lo usa; lo usa por dentro `HUNTER_MARK`) |

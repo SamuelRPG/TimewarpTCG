@@ -128,20 +128,46 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 * **EDITAR MIS MAZOS** abre el editor: catálogo completo (viene de la base de datos) con filtros por facción, tipo y búsqueda. **Clic izquierdo = añadir una copia, clic derecho = quitar una.** A la derecha ves el contador (`27 / 40`), las facciones, la curva de coste y la lista del mazo. Reglas, igual que en el servidor: **exactamente 40 cartas, máximo 3 copias de cada una, máximo 2 facciones**. El botón GUARDAR solo se activa cuando el mazo es válido; si guardas con el nombre de uno existente, lo sustituye (te pide confirmación).
 * **MAZO DEL BOT:** *Aleatorio* (por defecto) genera en cada partida un mazo legal distinto con cartas del catálogo; también puedes forzar AGGRO o CONTROL. El servidor escribe en su consola qué mazo ha elegido el bot (`[BOT] Mazo aleatorio: ...`).
 
-### Partida online contra otra persona
+### Jugar online contra un amigo (paso a paso)
 
-En el menú, **BUSCAR PARTIDA ONLINE** te mete en una cola; en cuanto otra persona hace lo mismo, empezáis (cada uno con el mazo que tenga elegido: AGGRO, CONTROL o uno de los tuyos). Las reglas, las cartas y el servidor son los mismos que contra el bot.
+Hacen falta **dos cosas**: que tu amigo tenga el juego y que los dos lleguéis al **mismo servidor** (tu backend). El servidor lo arrancas **tú**, en tu PC; tu amigo solo necesita el juego y la dirección.
 
-* **Hace falta un servidor al que lleguen los dos.** Tú pones su dirección en el campo *Servidor* del menú, igual que ahora con `localhost:8080`. Tres formas, de más fácil a más seria:
-  1. **En tu casa, con un amigo:** arranca el backend en tu PC y usa una VPN privada gratuita (Tailscale, ZeroTier o Hamachi): tu amigo escribe la IP que te da la VPN, por ejemplo `100.101.102.103:8080`. No hay que abrir puertos del router.
-  2. **Misma red local (mismo wifi):** tu IP local (`ipconfig` en Windows), por ejemplo `192.168.1.20:8080`. Quizá tengas que permitir Java en el cortafuegos de Windows.
-  3. **Publicado en internet:** el backend en un servidor con **HTTPS** (ver `docs/SEGURIDAD.md`, "Antes de enseñárselo a otras personas"). Entonces escribes `https://tu-dominio` y el cliente usa `wss://`.
-* **Bases de datos:** si los dos jugáis contra el mismo servidor, las cuentas y mazos son los de ese servidor (con Supabase, los guardados ahí).
-* **Invitados:** pueden jugar online con AGGRO o CONTROL. El rival ve tu nombre de cuenta (o `Invitado-xxxx`).
-* **Qué pasa si alguien se va:** si cierra el juego o se desconecta, **pierde** y el otro gana por abandono. Si el que tiene que actuar no hace nada en **3 minutos**, también pierde. No hay reconexión a una partida en curso.
-* **Qué NO hay todavía:** salas con código para jugar con un amigo concreto, clasificación, ni chat. Es "partida rápida" con quien esté buscando.
+**Paso 1 · Dale el juego a tu amigo (una sola vez).** Lo más cómodo es una versión ejecutable de Windows:
+1. En Unity abre la escena que ya tienes (la de siempre, `SampleScene`).
+2. *File ▸ Build Profiles* (o *Build Settings*) ▸ elige **Windows** ▸ **Add Open Scenes** ▸ **Build** y elige una carpeta.
+3. Antes de construir, comprueba *Edit ▸ Project Settings ▸ Player ▸ Other Settings ▸ Active Input Handling = **Both***.
+4. Comprime la carpeta resultante en un `.zip` y pásasela. Él la descomprime y ejecuta el `.exe`. No necesita Unity.
 
-Para probarlo tú solo: arranca el backend, abre **dos copias** del juego (el Editor de Unity y una compilación, o dos Editores) y pulsa BUSCAR PARTIDA ONLINE en ambas. Sin Unity: `dotnet run -c Release -- localhost:8080 PVP 1` en `tools/ClientSmokeTest` hace jugar a dos clientes automáticos.
+**Paso 2 · Arranca el servidor tú.** Doble clic en `arrancar-backend.cmd` (o `arrancar-backend-supabase.cmd` si quieres cuentas y mazos guardados en Supabase) y espera a ver `Started TimewarpApplication`. Déjalo abierto mientras jugáis.
+
+**Paso 3 · Que tu amigo llegue a tu PC.** Elige una de estas opciones:
+
+| Situación | Qué hacer |
+|---|---|
+| **Estáis en la misma casa / mismo wifi** | En tu PC, PowerShell: `ipconfig` y busca *Dirección IPv4* (p. ej. `192.168.1.20`). La dirección del servidor es `192.168.1.20:8080`. |
+| **Estáis en sitios distintos (lo más fácil)** | Usad **Tailscale** (gratis, sin tocar el router): los dos lo instaláis desde tailscale.com e iniciáis sesión; en el panel de Tailscale (*Machines*) **comparte tu PC con el correo de tu amigo**. En tu PC, `tailscale ip -4` te da una IP tipo `100.101.102.103`: esa es la dirección (`100.101.102.103:8080`). Funciona igual con ZeroTier o Hamachi. |
+| **Abrir un puerto en el router** | **No lo recomiendo**: el tráfico viaja sin cifrar (contraseñas incluidas) y expones tu PC a internet. Solo con HTTPS, mira `docs/SEGURIDAD.md`. |
+
+**El cortafuegos de Windows** suele bloquear las conexiones entrantes. Si tu amigo no puede conectar, abre PowerShell **como administrador** en tu PC y ejecuta:
+
+```powershell
+New-NetFirewallRule -DisplayName "Timewarp 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
+```
+
+(Para quitarla después: `Remove-NetFirewallRule -DisplayName "Timewarp 8080"`.)
+
+**Paso 4 · Comprobar la conexión antes de jugar.** Tu amigo abre en el navegador `http://TU_DIRECCION:8080/api/menu/cards` (con tu dirección del paso 3). Si ve un montón de texto con cartas (JSON), la conexión funciona. Si no carga, es el cortafuegos o la dirección.
+
+**Paso 5 · Jugar.** Cada uno, en el menú del juego:
+1. Escribe la dirección en **Servidor** (`100.101.102.103:8080`).
+2. Elige mazo: **AGGRO** o **CONTROL** sin cuenta, o tus mazos guardados (para eso cada uno necesita su cuenta en ese servidor: *CREAR CUENTA*, luego *ENTRAR*).
+3. Pulsa **BUSCAR PARTIDA ONLINE**. Cuando los dos estéis buscando, empieza la partida. (Emparejamiento por orden de llegada: si entra un tercero, se empareja con el siguiente que llegue.)
+
+**Reglas de la partida online:** son las mismas que contra el bot. Si alguien cierra el juego o se desconecta, **pierde**; si el que tiene que actuar no hace nada en **3 minutos**, también. No hay reconexión a una partida en curso.
+
+**Para probarlo tú solo:** abre **dos copias** del juego (el Editor de Unity y el `.exe` que construiste, o dos `.exe`) y pulsa BUSCAR PARTIDA ONLINE en ambas. Sin Unity: `dotnet run -c Release -- localhost:8080 PVP 1` en `tools/ClientSmokeTest` hace jugar a dos clientes automáticos.
+
+**Qué NO hay todavía:** salas con código para jugar con un amigo concreto (ahora es "partida rápida": quien esté buscando), clasificación ni chat.
 
 ## 5. Si algo falla
 
