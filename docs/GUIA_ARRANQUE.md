@@ -95,13 +95,22 @@ No hay escenas ni prefabs que montar: la interfaz se construye sola al pulsar Pl
 
 | Quiero… | Hago… |
 |---|---|
-| Bajar una unidad | Clic en la carta de la mano → clic en **TU BASE** |
-| Lanzar un hechizo | Clic en la carta → (elige objetivos si los pide) → **LANZAR** |
-| Mover una unidad | Clic en una unidad tuya lista → clic en la zona verde. Se ejecuta al pulsar **CONFIRMAR MOVIMIENTOS** |
+| Bajar una unidad | **Arrástrala** de la mano a **TU BASE**, o clic en la carta y clic en la base |
+| Lanzar un hechizo sin objetivo | Arrástralo hacia el tablero (fuera de la mano), o clic + **LANZAR** |
+| Lanzar un hechizo con objetivo | **Arrástralo sobre la unidad objetivo** (aparece una flecha dorada; se pone verde sobre un objetivo válido). Si pide varios, elige el resto con clic y pulsa **LANZAR** |
+| Mover una unidad | Arrastra una unidad tuya **lista** a otra zona (se resalta en verde), o clic en ella y clic en la zona. Se ejecuta al pulsar **CONFIRMAR MOVIMIENTOS** |
 | Pasar / terminar turno | Botón grande azul |
-| Qué hizo el bot | Registro (panel izquierdo inferior) |
+| Ver una carta en grande | Pasa el ratón por encima (panel izquierdo) |
+| Qué hizo el bot | Registro (panel izquierdo inferior) y efectos en el tablero: números flotantes (daño/bonos), partículas al destruirse, banner de turno |
 
 El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu backend en rojo.
+
+### Cuenta, mazos y mazo del bot (menú)
+
+* **Invitado:** sin nombre puedes jugar con los mazos de prueba AGGRO y CONTROL.
+* **Cuenta:** escribe un nombre y pulsa **ENTRAR** (si no existe, se crea). Así puedes guardar tus mazos y verlos en la lista **TU MAZO**.
+* **EDITAR MIS MAZOS** abre el editor: catálogo completo (viene de la base de datos) con filtros por facción, tipo y búsqueda. **Clic izquierdo = añadir una copia, clic derecho = quitar una.** A la derecha ves el contador (`27 / 40`), las facciones, la curva de coste y la lista del mazo. Reglas, igual que en el servidor: **exactamente 40 cartas, máximo 3 copias de cada una, máximo 2 facciones**. El botón GUARDAR solo se activa cuando el mazo es válido; si guardas con el nombre de uno existente, lo sustituye (te pide confirmación).
+* **MAZO DEL BOT:** *Aleatorio* (por defecto) genera en cada partida un mazo legal distinto con cartas del catálogo; también puedes forzar AGGRO o CONTROL. El servidor escribe en su consola qué mazo ha elegido el bot (`[BOT] Mazo aleatorio: ...`).
 
 ## 5. Si algo falla
 
@@ -116,11 +125,22 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 
 > No he podido ejecutar la interfaz dentro de Unity (no tengo Unity en mi entorno). La red y las reglas están probadas con más de 60 partidas contra tu backend y todo el código compila contra la API real de Unity, pero el aspecto visual puede necesitar ajustes.
 
-## 6. Más adelante: usar Supabase de verdad
+## 6. Usar tu Supabase de verdad (mazos y cartas guardados en la nube)
 
-1. En el panel de Supabase comprueba que el proyecto **no está pausado** (el plan gratuito pausa los inactivos; pulsa *Restore*).
-2. Quita el perfil `demo`. Tu `application.properties` ya apunta a Supabase.
-3. `data.sql` **no se ejecuta** con tu configuración (`spring.sql.init.mode=never`): las 6 cartas deben estar ya en `card_templates`; si no, ejecuta `data.sql` en el *SQL Editor* de Supabase.
+Con el perfil `demo` todo se pierde al cerrar el servidor. Para que cartas y mazos se guarden en Supabase:
+
+1. En el panel de Supabase comprueba que el proyecto **no está pausado** (el plan gratuito pausa los inactivos; pulsa *Restore project*).
+2. Arranca el backend **sin** el perfil `demo` (tu `application.properties` ya apunta a Supabase). La primera vez, Hibernate crea las tablas solo (`ddl-auto=update`).
+3. **Carga las cartas:** en Supabase ▸ *SQL Editor*, pega el contenido de **`docs/supabase/cartas.sql`** y pulsa *Run*. Es repetible: inserta las cartas nuevas y actualiza las existentes sin borrar nada (no rompe mazos ya guardados). Con tu configuración `data.sql` no se ejecuta, por eso este paso es necesario. Sin él, el editor de mazos mostrará el catálogo vacío.
+4. **Seguridad:** ejecuta también `docs/supabase/seguridad_rls.sql` (ver `docs/SEGURIDAD.md`).
+5. Abre Unity, entra con tu nombre, pulsa **EDITAR MIS MAZOS**: deben aparecer las 36 cartas.
+
+### Cómo añadir cartas nuevas
+1. Edita `docs/catalogo/cartas.csv` (Excel vale: separador `;`, UTF-8). Las columnas y valores permitidos están explicados en la cabecera de `tools/catalog/generar_sql.py`.
+2. Ejecuta `python tools/catalog/generar_sql.py` (valida el CSV y regenera `data.sql` y `docs/supabase/cartas.sql`).
+3. Pega el nuevo `cartas.sql` en Supabase. Reinicia el backend si usas el perfil `demo`.
+
+Hoy hay 36 cartas (4 facciones × 9: 6 unidades y 3 hechizos cada una), con keywords `JUMPER` y `DISRUPTION`, robar cartas, daño, bonificaciones, "gloria" y hechizos lentos/rápidos/instantáneos. Recuerda que solo `JUMPER` y `DISRUPTION` tienen lógica como keywords; el resto de efectos se declaran en la columna `effects`.
 
 ## 🔐 Seguridad: la contraseña de Supabase está en el historial de git
 
