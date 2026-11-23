@@ -30,6 +30,9 @@ Arrastra una unidad tuya que esté lista (no agotada) a la zona de destino (o cl
 <b><size=26>COMBATE</size></b>
 Si tras confirmar movimientos ambos jugadores tienen unidades en el mismo carril, empieza la fase de <b>combate</b>: podéis lanzar hechizos FAST/INSTANT. Si los dos pasáis seguidos, cada bando suma el Drive de sus unidades en ese carril y lo reparte como daño a las unidades rivales, empezando por las más débiles. Gana el combate quien suma más Drive (se activan los efectos «al ganar»). Si empatan, no gana nadie.
 
+<b><size=26>LA PILA (panel de la derecha)</size></b>
+Cuando alguien lanza un hechizo <b>FAST</b> o <b>SLOW</b>, o baja una unidad con efecto «al entrar», eso va a la <b>pila</b>. Mientras haya algo en la pila solo se puede <b>responder con hechizos FAST o INSTANT</b> o pasar: <b>no se pueden mover unidades ni bajar unidades</b>. Cuando pasáis los dos seguidos, la pila se resuelve <b>de arriba abajo</b>: la entrada de arriba (la última que se lanzó) va primero. Pasa el ratón sobre una entrada para marcarla en el tablero y <b>mantén pulsado el clic izquierdo</b> para ver la carta en grande y qué hace, también la del rival. Las unidades con efecto al entrar quedan ya en el tablero; solo su efecto espera en la pila.
+
 <b><size=26>HECHIZOS</size></b>
 <b>SLOW</b>: solo en tu fase principal; va a la pila.  <b>FAST</b>: también en respuesta; va a la pila.  <b>INSTANT</b>: se resuelve al momento. Cuando la pila se resuelve, el último hechizo lanzado va primero. Si el hechizo pide objetivos, arrástralo sobre la unidad objetivo (una flecha dorada te guía) o selecciónalos con clic y pulsa «Lanzar».
 

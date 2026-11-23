@@ -69,7 +69,9 @@ namespace TimewarpTCG
         readonly HashSet<string> _localPending = new HashSet<string>();
         bool _busy; float _busySince; string _lastKind, _lastCardId;
 
-        const float BoardW = 104f, BoardH = 144f;
+        const float BoardW = 98f, BoardH = 136f;          // algo mas pequenas para que 6 unidades quepan en un carril aunque haya panel de pila
+        const float BoardRight = 0.865f;                   // el tablero llega hasta aqui; de BoardRight a 1 va la PILA
+        const float BoardMid = 0.525f;                     // frontera entre el carril izquierdo y el derecho ((0.185 + BoardRight) / 2)
         const float HandW = 150f, HandH = 210f;
 
         // --- mano en abanico, arrastre y efectos
@@ -100,6 +102,7 @@ namespace TimewarpTCG
             BuildHud();
             BuildLeftColumn();
             BuildBoard();
+            BuildStackPanel();
             BuildHandAndActions();
             BuildOverlays();
             BuildFxLayers();
@@ -192,18 +195,13 @@ namespace TimewarpTCG
 
         void BuildLeftColumn()
         {
-            var insp = UiKit.Box(UiKit.Region(Root, "InspRegion", 0, 0.07f, 0.185f, 0.34f), "Inspector", UiKit.Panel);
+            var insp = UiKit.Box(UiKit.Region(Root, "InspRegion", 0, 0.07f, 0.185f, 0.40f), "Inspector", UiKit.Panel);
             UiKit.Stretch(insp.rectTransform);
             _inspector = UiKit.Label(insp.transform, CardView.Describe(null), 16, UiKit.TextCol, TextAnchor.UpperLeft);
             UiKit.Stretch(_inspector.rectTransform, 10, 8, 10, 8);
 
-            var stack = UiKit.Box(UiKit.Region(Root, "StackRegion", 0, 0.34f, 0.185f, 0.45f), "Stack", UiKit.Panel);
-            UiKit.Stretch(stack.rectTransform);
-            _stackText = UiKit.Label(stack.transform, "", 14, UiKit.TextCol, TextAnchor.UpperLeft);
-            UiKit.Stretch(_stackText.rectTransform, 10, 6, 10, 6);
-
             RectTransform content;
-            _logScroll = UiKit.MakeScroll(UiKit.Region(Root, "LogRegion", 0, 0.45f, 0.185f, 0.76f), UiKit.Panel, out content, "Log");
+            _logScroll = UiKit.MakeScroll(UiKit.Region(Root, "LogRegion", 0, 0.40f, 0.185f, 0.76f), UiKit.Panel, out content, "Log");
             UiKit.Stretch(_logScroll.GetComponent<RectTransform>());
             _log = UiKit.Label(content, "", 14, UiKit.TextCol, TextAnchor.UpperLeft);
             _log.verticalOverflow = VerticalWrapMode.Overflow;
@@ -321,20 +319,20 @@ namespace TimewarpTCG
         {
             // fila del rival
             _oppPanel = BuildPlayerPanel(UiKit.Region(Root, "OppInfoR", 0.185f, 0.07f, 0.33f, 0.235f));
-            _oppBase = MakeZone(UiKit.Region(Root, "OppBaseR", 0.33f, 0.07f, 1f, 0.235f), "BASE DEL BOT", false, Zone.Base);
+            _oppBase = MakeZone(UiKit.Region(Root, "OppBaseR", 0.33f, 0.07f, BoardRight, 0.235f), "BASE DEL BOT", false, Zone.Base);
 
             // carriles: cabecera + zona rival + zona propia
-            _laneLeftHdr = LaneHeader(UiKit.Region(Root, "LaneLH", 0.185f, 0.235f, 0.5925f, 0.265f, 2));
-            _oppLeft = MakeZone(UiKit.Region(Root, "OppLeftR", 0.185f, 0.265f, 0.5925f, 0.43f), "BOT · carril izquierdo", false, Zone.Left);
-            _myLeft = MakeZone(UiKit.Region(Root, "MyLeftR", 0.185f, 0.43f, 0.5925f, 0.595f), "TÚ · carril izquierdo", true, Zone.Left);
+            _laneLeftHdr = LaneHeader(UiKit.Region(Root, "LaneLH", 0.185f, 0.235f, BoardMid, 0.265f, 2));
+            _oppLeft = MakeZone(UiKit.Region(Root, "OppLeftR", 0.185f, 0.265f, BoardMid, 0.43f), "BOT · carril izquierdo", false, Zone.Left);
+            _myLeft = MakeZone(UiKit.Region(Root, "MyLeftR", 0.185f, 0.43f, BoardMid, 0.595f), "TÚ · carril izquierdo", true, Zone.Left);
 
-            _laneRightHdr = LaneHeader(UiKit.Region(Root, "LaneRH", 0.5925f, 0.235f, 1f, 0.265f, 2));
-            _oppRight = MakeZone(UiKit.Region(Root, "OppRightR", 0.5925f, 0.265f, 1f, 0.43f), "BOT · carril derecho", false, Zone.Right);
-            _myRight = MakeZone(UiKit.Region(Root, "MyRightR", 0.5925f, 0.43f, 1f, 0.595f), "TÚ · carril derecho", true, Zone.Right);
+            _laneRightHdr = LaneHeader(UiKit.Region(Root, "LaneRH", BoardMid, 0.235f, BoardRight, 0.265f, 2));
+            _oppRight = MakeZone(UiKit.Region(Root, "OppRightR", BoardMid, 0.265f, BoardRight, 0.43f), "BOT · carril derecho", false, Zone.Right);
+            _myRight = MakeZone(UiKit.Region(Root, "MyRightR", BoardMid, 0.43f, BoardRight, 0.595f), "TÚ · carril derecho", true, Zone.Right);
 
             // fila propia
             _myPanel = BuildPlayerPanel(UiKit.Region(Root, "MyInfoR", 0.185f, 0.595f, 0.33f, 0.76f));
-            _myBase = MakeZone(UiKit.Region(Root, "MyBaseR", 0.33f, 0.595f, 1f, 0.76f), "TU BASE", true, Zone.Base);
+            _myBase = MakeZone(UiKit.Region(Root, "MyBaseR", 0.33f, 0.595f, BoardRight, 0.76f), "TU BASE", true, Zone.Base);
         }
 
         Text LaneHeader(Transform region)
@@ -425,6 +423,7 @@ namespace TimewarpTCG
             _handCards.Clear(); _rects.Clear(); _prevScreen.Clear(); _prevHandIds.Clear();
             _hoverIdx = -1;
             AbortDrag();
+            HidePeek();
             ClearSelection();
             _gameOver.gameObject.SetActive(false);
             _disc.gameObject.SetActive(false);
@@ -436,6 +435,7 @@ namespace TimewarpTCG
         public void Tick()
         {
             // red de seguridad: un arrastre cuya carta de origen ya no existe nunca recibira OnEndDrag; un fantasma sin arrastre sobra
+            if (_peek != null && _peek.gameObject.activeSelf && _peekSource == null) HidePeek();   // la entrada que se mantenia ya no existe
             if (_dragging && _dragSourceRt == null) AbortDrag();
             else if (!_dragging && _ghost != null) EndDragVisuals();
             if (_toast.gameObject.activeSelf && Time.unscaledTime > _toastUntil) _toast.gameObject.SetActive(false);
@@ -869,21 +869,153 @@ namespace TimewarpTCG
             }
         }
 
+        // ============================================================ la PILA (panel a la derecha del tablero)
+        RectTransform _stackList, _peek, _peekHolder, _peekSource;
+        Text _peekCaption;
+        static readonly Color StackMine = new Color32(80, 140, 235, 255), StackTheirs = new Color32(226, 82, 82, 255);
+
+        void BuildStackPanel()
+        {
+            var panel = UiKit.Box(UiKit.Region(Root, "StackR", BoardRight, 0.07f, 1f, 0.76f, 2), "StackPanel", UiKit.Panel);
+            UiKit.Stretch(panel.rectTransform);
+            _stackText = UiKit.Label(panel.transform, "PILA", 24, UiKit.Gold, TextAnchor.UpperLeft, FontStyle.Bold);
+            UiKit.Place(_stackText.rectTransform, 0, 1, 12, -8, 230, 32);
+            Deco.GoldTitle(_stackText);
+            var sub = UiKit.Label(panel.transform, "Lo de ARRIBA se resuelve primero", 12, UiKit.Muted, TextAnchor.UpperLeft);
+            UiKit.Place(sub.rectTransform, 0, 1, 12, -40, 236, 18);
+            _stackList = UiKit.NewRect("StackList", panel.transform);
+            UiKit.Stretch(_stackList, 8, 66, 8, 62);
+            var foot = UiKit.Label(panel.transform, "Mantén pulsado el clic izquierdo sobre una entrada para ver la carta en grande.", 12, UiKit.Muted, TextAnchor.LowerLeft);
+            UiKit.Place(foot.rectTransform, 0, 0, 12, 8, 236, 48);
+
+            // vista grande: aparece MIENTRAS se mantiene el clic y desaparece al soltar (no bloquea el raton)
+            _peek = UiKit.NewRect("StackPeek", Root);
+            UiKit.Place(_peek, 0.5f, 0.5f, 40, 10, 360, 590);
+            var back = UiKit.Box(_peek, "PeekBack", new Color(0.04f, 0.05f, 0.09f, 0.94f), true, false);
+            UiKit.Stretch(back.rectTransform);
+            Deco.Halo(back, new Color(UiKit.Gold.r, UiKit.Gold.g, UiKit.Gold.b, 0.55f), 3f);
+            _peekHolder = UiKit.NewRect("PeekCard", _peek);
+            UiKit.Place(_peekHolder, 0.5f, 1, 0, -14, 300, 420);
+            _peekCaption = UiKit.Label(_peek, "", 15, UiKit.TextCol, TextAnchor.UpperCenter);
+            UiKit.Place(_peekCaption.rectTransform, 0.5f, 0, 0, 10, 336, 138);
+            _peek.gameObject.SetActive(false);
+        }
+
+        void HidePeek()
+        {
+            if (_peek != null) _peek.gameObject.SetActive(false);
+            _peekSource = null;
+        }
+
+        void ShowPeek(StackEntryDto e, int order, RectTransform source)
+        {
+            if (_peek == null || e == null) return;
+            _peekSource = source;
+            UiKit.ClearChildren(_peekHolder);
+            var card = GameRules.StackEntryToCard(e);
+            var v = CardView.Create(_peekHolder, card, 300, 420, new CardStyle(), null, null, null);
+            UiKit.Stretch(v.Root);
+            var cg = v.Root.GetComponent<CanvasGroup>();
+            if (cg != null) cg.blocksRaycasts = false;
+            bool mine = e.ownerId == _state.activePlayer.id;
+            string who = mine ? "<color=#7FB2FF>Tú</color>" : "<color=#FF8A80>" + _oppName + "</color>";
+            string what = e.kind == "TRIGGER" ? "Efecto <b>al entrar en juego</b> de esta unidad" : "Hechizo <b>" + (e.spellSpeed ?? "") + "</b>";
+            string targets = e.targetNames != null && e.targetNames.Count > 0 ? "\nObjetivos: <b>" + string.Join(", ", e.targetNames.ToArray()) + "</b>" : "";
+            _peekCaption.text = who + " · " + what + targets + "\n<color=#FFC43D>Se resuelve en " + ordinal(order) + " lugar</color>";
+            _peek.gameObject.SetActive(true);
+        }
+
+        static string ordinal(int n) { return n == 1 ? "1.er" : n + ".º"; }
+
+        /// <summary>Marca en el tablero la unidad que origina una entrada (dorado) y sus objetivos (naranja).</summary>
+        void FlashStackEntry(StackEntryDto e)
+        {
+            RectTransform rt;
+            if (_rects.TryGetValue(e.cardId, out rt) && rt != null) Fx.Flash(rt, UiKit.Gold);
+            if (e.targetIds != null)
+                foreach (var id in e.targetIds)
+                    if (_rects.TryGetValue(id, out rt) && rt != null) Fx.Flash(rt, UiKit.Orange);
+        }
+
         void RenderStack(GameStateDto s)
         {
-            if (s.spellStack == null || s.spellStack.Count == 0)
+            HidePeek();                                   // la lista se reconstruye: cualquier vista grande abierta pierde su origen
+            UiKit.ClearChildren(_stackList);
+            int n = s.spellStack == null ? 0 : s.spellStack.Count;
+            _stackText.text = n == 0 ? "PILA" : "PILA  (" + n + ")";
+            if (n == 0)
             {
-                _stackText.text = "<b>PILA DE HECHIZOS</b>\n<color=#9AA2B8>(vacía)</color>";
+                var empty = UiKit.Label(_stackList, "Vacía.\n\nCuando alguien lance un hechizo rápido o lento, o juegue una unidad con efecto «al entrar», aparecerá aquí y el rival podrá responder.", 14, UiKit.Muted, TextAnchor.UpperLeft);
+                UiKit.Stretch(empty.rectTransform, 4, 4, 4, 0);
                 return;
             }
-            var sb = new System.Text.StringBuilder("<b>PILA DE HECHIZOS</b> <color=#9AA2B8>(arriba = se resuelve primero)</color>\n");
-            for (int i = s.spellStack.Count - 1; i >= 0; i--)
+
+            const float EntryH = 86f, CaptionH = 18f, Gap = 6f;
+            float y = 0f;
+            int shown = Mathf.Min(n, 5);
+            for (int k = 0; k < shown; k++)
             {
-                var e = s.spellStack[i];
+                var e = s.spellStack[n - 1 - k];          // el ULTIMO de la lista es el primero en resolverse
+                int order = k + 1;
                 bool mine = e.ownerId == s.activePlayer.id;
-                sb.Append(mine ? "<color=#7FB2FF>Tú</color>" : "<color=#FF8A80>" + _oppName + "</color>").Append(": <b>").Append(e.cardName).Append("</b> (").Append(e.spellSpeed).Append(")\n");
+                bool trigger = e.kind == "TRIGGER";
+                Color side = mine ? StackMine : StackTheirs;
+
+                // etiqueta de orden
+                var cap = UiKit.Label(_stackList, k == 0 ? "SE RESUELVE PRIMERO" : "LUEGO", k == 0 ? 12 : 11, k == 0 ? UiKit.Gold : UiKit.Muted, TextAnchor.LowerLeft, FontStyle.Bold);
+                SetTopStretch(cap.rectTransform, y, CaptionH);
+                y += CaptionH;
+
+                // la entrada
+                var box = UiKit.Box(_stackList, "StackEntry", new Color32(34, 42, 68, 255));
+                SetTopStretch(box.rectTransform, y, EntryH);
+                if (k == 0) UiKit.AddOutline(box, UiKit.Gold, 2f);
+                var bar = UiKit.Box(box.transform, "Side", side, false, false);
+                bar.rectTransform.anchorMin = new Vector2(0, 0); bar.rectTransform.anchorMax = new Vector2(0, 1);
+                bar.rectTransform.pivot = new Vector2(0, 0.5f); bar.rectTransform.sizeDelta = new Vector2(6, 0);
+
+                var num = UiKit.CircleImage(box.transform, "Num", k == 0 ? UiKit.Gold : UiKit.PanelLight);
+                UiKit.Place(num.rectTransform, 0, 0.5f, 14, 0, 32, 32);
+                var numT = UiKit.Label(num.transform, order.ToString(), 18, k == 0 ? Color.black : Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UiKit.Stretch(numT.rectTransform);
+
+                var name = UiKit.Label(box.transform, e.cardName, 16, Color.white, TextAnchor.MiddleLeft, FontStyle.Bold);
+                UiKit.BestFit(name, 10, 16);
+                name.rectTransform.anchorMin = new Vector2(0, 1); name.rectTransform.anchorMax = new Vector2(1, 1);
+                name.rectTransform.pivot = new Vector2(0, 1); name.rectTransform.offsetMin = new Vector2(54, -28); name.rectTransform.offsetMax = new Vector2(-6, -4);
+
+                string kind = trigger ? "AL ENTRAR" : "HECHIZO " + (e.spellSpeed ?? "");
+                string owner = mine ? "<color=#7FB2FF>TÚ</color>" : "<color=#FF8A80>" + _oppName.ToUpperInvariant() + "</color>";
+                var tag = UiKit.Label(box.transform, owner + "  ·  <color=" + (trigger ? "#C9A0FF" : "#7FE0A8") + ">" + kind + "</color>", 12, UiKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);
+                tag.rectTransform.anchorMin = new Vector2(0, 1); tag.rectTransform.anchorMax = new Vector2(1, 1);
+                tag.rectTransform.pivot = new Vector2(0, 1); tag.rectTransform.offsetMin = new Vector2(54, -48); tag.rectTransform.offsetMax = new Vector2(-6, -30);
+
+                string tgt = e.targetNames != null && e.targetNames.Count > 0 ? "→ " + string.Join(", ", e.targetNames.ToArray()) : (trigger ? "sin objetivo" : "sin objetivos");
+                var tl = UiKit.Label(box.transform, tgt, 12, UiKit.Muted, TextAnchor.UpperLeft);
+                tl.rectTransform.anchorMin = new Vector2(0, 0); tl.rectTransform.anchorMax = new Vector2(1, 0);
+                tl.rectTransform.pivot = new Vector2(0, 0); tl.rectTransform.offsetMin = new Vector2(54, 4); tl.rectTransform.offsetMax = new Vector2(-6, 36);
+
+                // interaccion: pasar el raton = detalles a la izquierda y resalte en el tablero; MANTENER el clic = carta en grande
+                var entry = e; int ord = order; var rt = box.rectTransform;
+                UiKit.OnClick(box.gameObject, null, () => { Inspect(GameRules.StackEntryToCard(entry)); FlashStackEntry(entry); }, null);
+                var hp = box.gameObject.AddComponent<HoldPeek>();
+                hp.OnHold = () => ShowPeek(entry, ord, rt);
+                hp.OnRelease = HidePeek;
+
+                y += EntryH + Gap;
             }
-            _stackText.text = sb.ToString();
+            if (n > shown)
+            {
+                var more = UiKit.Label(_stackList, "… y " + (n - shown) + " más debajo", 13, UiKit.Muted, TextAnchor.UpperLeft);
+                SetTopStretch(more.rectTransform, y, 20);
+            }
+        }
+
+        /// <summary>Coloca un rectangulo a todo el ancho de su padre, a 'y' px desde arriba.</summary>
+        static void SetTopStretch(RectTransform rt, float y, float h)
+        {
+            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
+            rt.anchoredPosition = new Vector2(0, -y); rt.sizeDelta = new Vector2(0, h);
         }
 
         void RenderActions(GameStateDto s, HashSet<string> pending, bool over)

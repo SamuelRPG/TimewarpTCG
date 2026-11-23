@@ -57,6 +57,15 @@ namespace TimewarpTCG
         public string ownerId;
         public string spellSpeed;
         public List<string> targetIds = new List<string>();
+
+        // información pública de la entrada (también de los hechizos del rival): para ver qué hace
+        public string kind;            // SPELL = hechizo lanzado | TRIGGER = efecto "al entrar en juego" de una unidad
+        public string description;
+        public int currentCost;
+        public string faction;
+        public string cardType;        // SPELL | UNIT
+        public List<string> keywords = new List<string>();
+        public List<string> targetNames = new List<string>();
     }
 
     [Serializable]

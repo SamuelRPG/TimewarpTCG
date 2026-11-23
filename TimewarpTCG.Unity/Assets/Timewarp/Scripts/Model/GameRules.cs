@@ -229,7 +229,7 @@ namespace TimewarpTCG
             if (pending != null && pending.Count > 0)
                 return "Tienes " + pending.Count + " movimiento(s) sin confirmar. Pulsa «Confirmar movimientos» (pasa prioridad) para ejecutarlos.";
             if (s.spellStack != null && s.spellStack.Count > 0)
-                return "Hay " + s.spellStack.Count + " hechizo(s) en la pila. Responde o pasa para resolver.";
+                return "Hay " + s.spellStack.Count + " cosa(s) en la pila (a la derecha). Solo puedes responder con un hechizo FAST o INSTANT, o pasar. Cuando pasáis los dos seguidos, se resuelve de arriba abajo.";
             return "Tienes la prioridad: juega, mueve o pasa.";
         }
 
@@ -272,8 +272,28 @@ namespace TimewarpTCG
         {
             if (IsOver(s)) return "La partida ha terminado.";
             if (!s.activePlayer.hasPriority) return "No tienes la prioridad.";
+            if (StackClosesPhase(s)) return "No puedes mover unidades mientras hay algo en la pila: solo puedes responder con un hechizo FAST o INSTANT, o pasar.";
             if (c.isExhausted) return "Está agotada: se recupera al empezar el siguiente turno.";
             return null;
+        }
+
+        /// <summary>Hay algo en la pila (fase cerrada): solo se puede responder con hechizos FAST/INSTANT o pasar.</summary>
+        public static bool StackClosesPhase(GameStateDto s)
+        {
+            return s.gamePhase == "MAIN_CLOSED" || s.gamePhase == "COMBAT_CLOSED" || (s.spellStack != null && s.spellStack.Count > 0);
+        }
+
+        /// <summary>Una entrada de la pila como si fuera una carta, para poder dibujarla y verla en grande (los hechizos del rival no están en tu mano).</summary>
+        public static CardDto StackEntryToCard(StackEntryDto e)
+        {
+            return new CardDto
+            {
+                id = e.cardId, name = e.cardName, description = e.description,
+                cardType = string.IsNullOrEmpty(e.cardType) ? "SPELL" : e.cardType,
+                currentCost = e.currentCost, faction = e.faction,
+                spellSpeed = e.kind == "TRIGGER" ? "NOT_A_SPELL" : e.spellSpeed,
+                keywords = e.keywords ?? new List<string>()
+            };
         }
 
         /// <summary>¿Parece legal mover esta unidad a ese destino? (PlayerState.validateMovement)</summary>

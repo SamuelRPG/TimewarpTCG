@@ -190,7 +190,9 @@ namespace TimewarpTCG
                 if (prev.spellStack != null) foreach (var e in prev.spellStack) prevIds.Add(e.cardId);
                 foreach (var e in next.spellStack)
                     if (!prevIds.Contains(e.cardId))
-                        lines.Add("   «" + e.cardName + "» entra en la pila (" + (e.ownerId == next.activePlayer.id ? "Tú" : OpponentName) + ").");
+                        lines.Add(e.kind == "TRIGGER"
+                            ? "   El efecto al entrar de «" + e.cardName + "» va a la pila (" + (e.ownerId == next.activePlayer.id ? "Tú" : OpponentName) + ")."
+                            : "   «" + e.cardName + "» entra en la pila (" + (e.ownerId == next.activePlayer.id ? "Tú" : OpponentName) + ").");
             }
             if (pPrev > 0 && pNext == 0) lines.Add("   La pila se resuelve.");
 
