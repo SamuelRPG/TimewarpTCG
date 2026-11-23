@@ -19,7 +19,8 @@ Tres bloques: **(1)** lo que ya hace el código y cómo se ha comprobado, **(2)*
 | **Origen cruzado** | `@CrossOrigin("*")` y WebSocket abierto a cualquier origen. | Por defecto solo `localhost`. Para tu web: `timewarp.cors.allowed-origins=https://tu-dominio` (o la variable `TIMEWARP_CORS_ALLOWED_ORIGINS`). Un cliente Unity de escritorio no envía `Origin` y no le afecta. |
 | **Datos internos en errores** | Los mensajes de excepción iban tal cual al jugador. | Errores genéricos hacia fuera; el detalle queda solo en el log del servidor. Las reglas del juego sí se explican ("no tienes recurso suficiente"). |
 | **Credenciales en el repo** | La contraseña de Supabase estaba en `application.properties`, versionado. | El fichero ya no tiene secretos y arranca con H2 en memoria. Tus datos van en variables de entorno / `supabase.env.cmd` (en `.gitignore`). |
-| **Mazos** | — | 40 cartas, 3 copias, 2 facciones, nombre y número de mazos se validan **en el servidor**, aunque el editor de Unity ya los aplique. |
+| **Partidas online** | No existían. | La cola (`/app/game/joinQueue`) exige token, usa **tu** identidad (un `playerId` ajeno se rechaza), solo admite un mazo legal (los invitados, AGGRO/CONTROL) y no te empareja contigo mismo. Cada jugador solo recibe **su** vista (la mano del rival no viaja). Abandonar o desconectarse es una derrota, y quien no actúa en 3 minutos pierde: nadie puede dejar a otro colgado. Una desconexión **antigua** no puede tumbar tu partida nueva (se compara la sesión). |
+| **Mazos** | — | 40 cartas, 3 copias, 2 facciones, nombre y número de mazos se validan **en el servidor**, aunque el editor de Unity ya los aplique. La regla de facciones se **vuelve a comprobar al empezar cada partida**, así que un mazo tocado directamente en la base de datos tampoco entra. También se validan en el servidor los **objetivos** de cada carta (cantidad, bando y que estén en juego), tanto de hechizos como de unidades. |
 | **Cifrado** | `ws://` y `http://`. | El cliente Unity usa `wss://` cuando escribes `https://…` como servidor (nunca degrada a `ws://`). El cifrado en sí lo pone el proxy HTTPS del apartado 2.4. |
 | **Dependencias** | Spring Boot 3.2.0 (sin parches). | Spring Boot 3.5.16; no hay SQL escrito a mano (todo JPA con parámetros). |
 | **Base de datos** | El backend usaba el rol dueño de todo. | Script `docs/supabase/rol_app.sql`: rol que solo puede leer/escribir las 4 tablas (sin crear, borrar ni alterar tablas) y `docs/supabase/seguridad_rls.sql`: la API pública de Supabase no ve nada. |
@@ -27,7 +28,7 @@ Tres bloques: **(1)** lo que ya hace el código y cómo se ha comprobado, **(2)*
 ### Cómo se ha comprobado (repítelo cuando cambies algo)
 
 * `mvnw test` (en `TimewarpTCG.Back`): 36 pruebas, entre ellas contraseñas, tokens manipulados/caducados, límites y los endpoints REST.
-* `dotnet run -c Release -- localhost:8080 SECURITY 1` (en `tools/ClientSmokeTest`, con el backend en marcha): **16 ataques reales** contra el servidor (mazos sin token o con uno falso, borrar cuentas sin autenticar, conectar sin token, espiar el canal de otro, iniciar partida como otro, actuar en la partida de otro, invitado con mazo propio, inundación). Debe terminar con `SEGURIDAD: TODO OK`.
+* `dotnet run -c Release -- localhost:8080 SECURITY 1` (en `tools/ClientSmokeTest`, con el backend en marcha): **19 comprobaciones de ataque reales** contra el servidor (mazos sin token o con uno falso, borrar cuentas sin autenticar, conectar sin token, espiar el canal de otro, iniciar partida como otro, actuar en la partida de otro, invitado con mazo propio, inundación). Debe terminar con `SEGURIDAD: TODO OK`.
 * Partidas completas como invitado y con cuenta y mazo propio, contra H2 **y contra PostgreSQL con el rol restringido** (que además intentó `DROP`, `CREATE`, `ALTER`, `TRUNCATE`, desactivar RLS y borrar cartas: todo rechazado; y el rol de la API pública vio 0 filas).
 
 ---
@@ -77,7 +78,8 @@ Un servidor accesible desde internet necesita:
 * **No hay recuperación de contraseña ni correo electrónico:** si alguien la olvida, hay que cambiarla a mano en la base de datos.
 * **Los contadores anti-fuerza-bruta y los límites viven en la memoria del servidor:** se reinician al apagarlo y no se comparten entre varias instancias (con una sola, como ahora, no es problema).
 * **No hay límite de ritmo en los endpoints de mazos** (solo el tope de 30 mazos por usuario y el de tamaño de mensaje); el de registro/login/invitado sí lo tiene.
-* **No hay temporizador de turno** ni detección de trampas más allá de que el servidor valida todas las reglas.
+* **Online:** solo hay "partida rápida" (cola por orden de llegada). No hay reconexión a una partida en curso, ni salas privadas, ni clasificación, ni detección de que dos jugadores se pongan de acuerdo. El único límite de tiempo es el de 3 minutos sin actuar (`timewarp.pvp.turn-seconds`).
+* **Trampas:** más allá de que el servidor valida todas las reglas, no hay detección de comportamientos raros.
 * **Las partidas siguen en RAM:** si se reinicia el servidor, se pierden las partidas en curso.
 * **Cuentas antiguas** (creadas cuando solo hacía falta el nombre): no pueden entrar. Ver `docs/GUIA_ARRANQUE.md`, punto 6, para recuperarlas.
 

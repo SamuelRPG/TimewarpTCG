@@ -202,6 +202,21 @@ Y los mazos: `decks` (un mazo de un usuario) → `deck_cards` (`card_template_id
 
 ## 10. Cartas del catálogo agrupadas por receta
 
+> Esta tabla resume los **patrones** con las cartas originales. Las 116 cartas (incluidas las 80 nuevas, con efectos combinados) están, una por una y con su receta traducida, en [`catalogo/CARTAS_EXPLICADAS.md`](catalogo/CARTAS_EXPLICADAS.md).
+
+**Combinaciones nuevas que conviene conocer** (todas están en el catálogo y probadas en `EffectsReferenceTest`):
+
+| Receta | Qué consigue |
+|---|---|
+| `ON_PLACED:ENEMY_DAMAGE:3;ON_PLACED:ALLY_BOOST:3` con `targets` `1:ENEMY;1:ALLY` | Cada acción solo afecta a los objetivos de su bando: un golpe y un refuerzo con una sola carta |
+| `ON_DESTROYED:DRAW:1` | "Al morir, roba": es el único efecto útil al morir con las acciones actuales (las demás necesitan estar vivas o tener objetivos) |
+| `ON_COMBAT_WIN:DRAW:1` / `ON_COMBAT_WIN:SELF_BUFF:1;ON_COMBAT_WIN:READY_SELF` | Recompensas por ganar combates, y varias a la vez |
+| `ON_DAMAGE_TAKEN:SELF_BUFF:1;ON_DAMAGE_TAKEN:READY_SELF;ON_DAMAGE_TAKEN:DRAW:1` | "Contraataque": solo si **sobrevive** al daño |
+| `ON_MOVEMENT_CONFIRMED:DRAW:1` | Explorar da cartas (con `JUMPER` puede repetirse cada turno) |
+| `ON_PLACED:HUNTER_MARK:1:3;ON_PLACED:DRAW:1` | Marca y además roba |
+
+> ⚠️ `HUNTER_MARK` no filtra por bando: no lo combines con objetivos `ALLY` (dañaría a tu propia unidad). Úsalo solo con `ENEMY`.
+
 | Receta | Cartas | En palabras |
 |---|---|---|
 | unidad sin nada | Infantería Rápida, Escriba del Templo, Legionario, Autómata de Vapor… | Solo cuerpo |
@@ -236,7 +251,7 @@ Al arrancar, el backend revisa todas las filas de `card_templates` y escribe en 
 [CATALOGO] 37 cartas revisadas, 1 aviso(s).
 ```
 
-(Con el catálogo actual sale `36 cartas revisadas, 0 aviso(s).`)
+(Con el catálogo actual sale `116 cartas revisadas, 0 aviso(s).`)
 
 | Lo que escribes | Qué pasa | Lo que verás |
 |---|---|---|

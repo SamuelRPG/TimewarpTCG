@@ -50,6 +50,16 @@ autenticar, conectar al WebSocket sin token, suscribirse al canal de otro jugado
 partida de otro, usar un mazo propio siendo invitado e inundar el servidor de mensajes. Termina con `SEGURIDAD: TODO OK` (código de salida 0)
 o lista los fallos. Conviene ejecutarlo tras cualquier cambio en `infrastructure/security`.
 
+## Probar el modo online (dos jugadores)
+
+```bash
+dotnet run -c Release -- localhost:8080 PVP 2
+```
+
+Hace jugar a **dos clientes reales** entre sí por la cola de emparejamiento, `2` partidas completas, y comprueba: que los dos ven la misma partida desde su lado, que la mano del rival no viaja, que actuar sin prioridad se rechaza, que acaban con el mismo ganador y marcador, y los casos límite: **abandonar**, **desconexión brusca**, **salir de la cola**, invitado con mazo propio y pulsar "buscar" dos veces. Termina con `ONLINE: TODO OK`.
+
+> **El ritmo del bot.** Por defecto el bot juega una acción cada ~0,7 s. Para pruebas rápidas arranca el backend con `TIMEWARP_BOT_DELAY_MS=0` (juega de golpe, como antes); el agente de pruebas funciona con cualquier valor porque espera a que el bot devuelva la prioridad.
+
 ## tools/catalog/generar_sql.py
 
 Genera `data.sql` y `docs/supabase/cartas.sql` desde `docs/catalogo/cartas.csv` (ver `docs/GUIA_ARRANQUE.md`, sección "Cómo añadir cartas nuevas").

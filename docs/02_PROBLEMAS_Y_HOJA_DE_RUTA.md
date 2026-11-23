@@ -19,7 +19,7 @@ Todo lo de aquí está comprobado ejecutando tu código (no solo leyéndolo), sa
 | B1 Unidad matada por hechizo/efecto seguía en el tablero | ✅ Arreglado (`GameState.cleanupDestroyed`) + tests | `EngineFixesTest` |
 | B2 Hechizo SLOW fuera de fase se "tragaba" la carta | ✅ Arreglado (validación antes de gastar recurso) + tests | `EngineFixesTest` |
 | B3 `GET /api/menu/cards` devolvía 500 | ✅ Devuelve un DTO de catálogo | `MenuController` |
-| B4 No se podía armar ningún mazo (6 cartas) | ✅ Catálogo de **36 cartas** + editor de mazos en Unity + API de mazos | `docs/catalogo/cartas.csv` |
+| B4 No se podía armar ningún mazo (6 cartas) | ✅ Catálogo de **116 cartas** + editor de mazos en Unity + API de mazos | `docs/catalogo/cartas.csv` |
 | B5 `DrawCardAction` vacía | ✅ Implementada y registrada como `DRAW` | `EffectFactory` |
 | **Nuevo:** los mazos **no se barajaban nunca** (se robaban en el orden de la lista: 25 infanterías seguidas; el bot CONTROL no veía un hechizo hasta el turno ~20) | ✅ Se barajan al empezar | `StartMatchShuffleTest` |
 | **Nuevo:** los mazos guardados fallaban al iniciar partida (`LazyInitializationException`) | ✅ `@Transactional` en el repositorio | verificado con Postgres real |

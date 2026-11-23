@@ -27,7 +27,7 @@ git checkout feature/unity-sobre-develop
 
 Supabase es una base de datos **en la nube**, no se "arranca" en tu PC. Para jugar contra el bot no hace falta: los mazos AGGRO y CONTROL salen del código.
 
-**Por defecto el servidor arranca con una base de datos en memoria (H2)**: sin internet, sin Supabase y sin configurar nada. Las 36 cartas se cargan solas. Lo que se pierde al cerrar el servidor son las cuentas y los mazos que crees. Para guardarlos en Supabase, mira el punto 6.
+**Por defecto el servidor arranca con una base de datos en memoria (H2)**: sin internet, sin Supabase y sin configurar nada. Las 116 cartas se cargan solas. Lo que se pierde al cerrar el servidor son las cuentas y los mazos que crees. Para guardarlos en Supabase, mira el punto 6.
 
 > Esto cambió respecto a versiones anteriores de esta guía: ya **no** hace falta el perfil `demo` ni tocar `application.properties`. Ese fichero ya no contiene ninguna contraseña.
 
@@ -106,6 +106,20 @@ No hay escenas ni prefabs que montar: la interfaz se construye sola al pulsar Pl
 
 El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu backend en rojo.
 
+**Cómo leer el tablero de un vistazo** (también en el botón *¿Cómo se juega?*):
+
+| Señal | Significa |
+|---|---|
+| Carta de la mano con **borde verde y etiqueta JUGAR** | Se puede jugar ahora mismo |
+| Carta **gris** con un motivo escrito encima (`SIN RECURSO`, `ESPERA`, `AHORA NO`, `BASE LLENA`…) | No se puede jugar, y por qué. Si no te llega el recurso, el coste sale en **rojo** |
+| Unidad tuya con **borde verde y etiqueta MOVER** | Está lista: puedes moverla |
+| Unidad con **AGOTADA** | Ya se movió; no puede hasta tu próximo turno (o hasta que se recupere por un efecto) |
+| Barra superior **TU PRIORIDAD · ACTÚA** (verde) o **JUEGA EL BOT…** (naranja) | Quién puede actuar. Cada tarjeta de jugador también muestra `● PRIORIDAD` / `○ ESPERA` |
+| Tarjeta del jugador: **RECURSO 3 / 5** con gemas | Recurso disponible y máximo de este turno (azul brillante = te queda, translúcido = ya gastado). El máximo es `min(turno, 10)` y se renueva entero cada turno |
+| **PUNTOS 4 / 10** con marcas doradas | Tu marcador (hay que llegar a 10 con 2 de ventaja) |
+
+**El bot juega con pausas:** hace una acción cada ~0,7 segundos (una partida completa dura así 40-60 s), y tras cada una ves el tablero actualizado, para que puedas seguir qué hace. Se regula en `application.properties` (`timewarp.bot.delay-ms`, en milisegundos; `0` = de golpe).
+
 ### Cuenta, mazos y mazo del bot (menú)
 
 * **Invitado:** sin nombre puedes jugar con los mazos de prueba AGGRO y CONTROL.
@@ -113,6 +127,21 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 * Si usas la base en memoria, las cuentas desaparecen al apagar el servidor.
 * **EDITAR MIS MAZOS** abre el editor: catálogo completo (viene de la base de datos) con filtros por facción, tipo y búsqueda. **Clic izquierdo = añadir una copia, clic derecho = quitar una.** A la derecha ves el contador (`27 / 40`), las facciones, la curva de coste y la lista del mazo. Reglas, igual que en el servidor: **exactamente 40 cartas, máximo 3 copias de cada una, máximo 2 facciones**. El botón GUARDAR solo se activa cuando el mazo es válido; si guardas con el nombre de uno existente, lo sustituye (te pide confirmación).
 * **MAZO DEL BOT:** *Aleatorio* (por defecto) genera en cada partida un mazo legal distinto con cartas del catálogo; también puedes forzar AGGRO o CONTROL. El servidor escribe en su consola qué mazo ha elegido el bot (`[BOT] Mazo aleatorio: ...`).
+
+### Partida online contra otra persona
+
+En el menú, **BUSCAR PARTIDA ONLINE** te mete en una cola; en cuanto otra persona hace lo mismo, empezáis (cada uno con el mazo que tenga elegido: AGGRO, CONTROL o uno de los tuyos). Las reglas, las cartas y el servidor son los mismos que contra el bot.
+
+* **Hace falta un servidor al que lleguen los dos.** Tú pones su dirección en el campo *Servidor* del menú, igual que ahora con `localhost:8080`. Tres formas, de más fácil a más seria:
+  1. **En tu casa, con un amigo:** arranca el backend en tu PC y usa una VPN privada gratuita (Tailscale, ZeroTier o Hamachi): tu amigo escribe la IP que te da la VPN, por ejemplo `100.101.102.103:8080`. No hay que abrir puertos del router.
+  2. **Misma red local (mismo wifi):** tu IP local (`ipconfig` en Windows), por ejemplo `192.168.1.20:8080`. Quizá tengas que permitir Java en el cortafuegos de Windows.
+  3. **Publicado en internet:** el backend en un servidor con **HTTPS** (ver `docs/SEGURIDAD.md`, "Antes de enseñárselo a otras personas"). Entonces escribes `https://tu-dominio` y el cliente usa `wss://`.
+* **Bases de datos:** si los dos jugáis contra el mismo servidor, las cuentas y mazos son los de ese servidor (con Supabase, los guardados ahí).
+* **Invitados:** pueden jugar online con AGGRO o CONTROL. El rival ve tu nombre de cuenta (o `Invitado-xxxx`).
+* **Qué pasa si alguien se va:** si cierra el juego o se desconecta, **pierde** y el otro gana por abandono. Si el que tiene que actuar no hace nada en **3 minutos**, también pierde. No hay reconexión a una partida en curso.
+* **Qué NO hay todavía:** salas con código para jugar con un amigo concreto, clasificación, ni chat. Es "partida rápida" con quien esté buscando.
+
+Para probarlo tú solo: arranca el backend, abre **dos copias** del juego (el Editor de Unity y una compilación, o dos Editores) y pulsa BUSCAR PARTIDA ONLINE en ambas. Sin Unity: `dotnet run -c Release -- localhost:8080 PVP 1` en `tools/ClientSmokeTest` hace jugar a dos clientes automáticos.
 
 ## 5. Si algo falla
 
@@ -122,6 +151,8 @@ El cliente solo da pistas; no bloquea jugadas ilegales: verás el error de tu ba
 | El backend no arranca y menciona `HikariPool`, `Connection` o `postgresql` | Tienes definidas variables `SPRING_DATASOURCE_*` o el perfil `supabase` y Supabase no responde (¿proyecto pausado?). Quítalas para volver a la base en memoria. |
 | Unity: "Esta cuenta se creó antes de que existieran las contraseñas…" | Es una cuenta de la versión sin contraseñas. Crea una cuenta nueva (o mira la nota del punto 6). |
 | Unity: "Demasiados intentos" / 429 | Frenos anti-abuso: espera unos minutos. |
+| No puedo escribir en los campos de texto (nombre, contraseña, servidor) | Casi seguro es el modo de entrada de Unity 6. Ya se corrige solo, pero si sigue pasando: *Edit ▸ Project Settings ▸ Player ▸ Other Settings ▸ Active Input Handling = **Both***, y reinicia Unity. Pulsa el botón **VER** junto a la contraseña para comprobar que lo que escribes entra. Mira también la consola de Unity (`[Timewarp]…`) |
+| "Error de base de datos" al CREAR CUENTA | Falta la columna `password_hash` en la tabla `users` de Supabase. La consola del backend lo explica (`[CUENTAS] ATENCION…`). Pega `docs/supabase/anadir_password_hash.sql` en el SQL Editor de Supabase. **No hay ninguna tabla nueva**: solo esa columna en `users` |
 | Unity: dejó de responder tras reiniciar el servidor | La sesión se firmó con la clave anterior. Vuelve al menú y pulsa **ENTRAR** (o define `TIMEWARP_JWT_SECRET`). |
 | `mvn no se reconoce` | No uses `mvn`: usa `.\\mvnw.cmd` (Camino B) o IntelliJ (Camino A). |
 | Unity: los clics no hacen nada (Unity 6) | *Edit ▸ Project Settings ▸ Player ▸ Other Settings ▸ Active Input Handling = **Both***, y reinicia Unity. |
@@ -139,7 +170,7 @@ Con la base en memoria todo se pierde al cerrar el servidor. Para que se guarde 
 3. Arranca con doble clic en **`arrancar-backend-supabase.cmd`** (carga ese fichero y activa el perfil `supabase`). La primera vez Hibernate crea las tablas solo y añade a `users` la columna `password_hash`.
 4. **Carga las cartas:** en Supabase ▸ *SQL Editor*, pega el contenido de **`docs/supabase/cartas.sql`** y pulsa *Run*. Es repetible: inserta las cartas nuevas y actualiza las existentes sin borrar nada (no rompe mazos ya guardados). Con Supabase `data.sql` no se ejecuta, por eso este paso es necesario. Sin él, el editor de mazos mostrará el catálogo vacío.
 5. **Seguridad (hazlo una vez):** ejecuta `docs/supabase/seguridad_rls.sql` y después `docs/supabase/rol_app.sql` (cambia antes la contraseña que lleva dentro); las instrucciones para usar ese rol están al final del propio fichero. Más detalle en `docs/SEGURIDAD.md`.
-6. Abre Unity, pulsa **CREAR CUENTA** con un nombre y contraseña, y **EDITAR MIS MAZOS**: deben aparecer las 36 cartas.
+6. Abre Unity, pulsa **CREAR CUENTA** con un nombre y contraseña, y **EDITAR MIS MAZOS**: deben aparecer las 116 cartas (si ves solo 36, vuelve a pegar `docs/supabase/cartas.sql`: las 80 nuevas hay que cargarlas en Supabase una vez).
 
 > **Cuentas antiguas.** Las filas que ya tengas en `users` se crearon cuando solo hacía falta el nombre y no tienen contraseña, así que **nadie puede entrar con ellas** (es lo seguro por defecto: si no, cualquiera podría apropiarse de la cuenta). Crea una cuenta nueva. Si necesitas conservar los mazos de una cuenta antigua, arranca **una sola vez** con `set TIMEWARP_SECURITY_ALLOW_CLAIM_LEGACY_ACCOUNTS=true` en `supabase.env.cmd`, entra tú con ese nombre y una contraseña (la primera que se use queda como definitiva), y quita la línea.
 
@@ -150,7 +181,7 @@ Con la base en memoria todo se pierde al cerrar el servidor. Para que se guarde 
 2. Ejecuta `python tools/catalog/generar_sql.py` (valida el CSV y regenera `data.sql` y `docs/supabase/cartas.sql`).
 3. Pega el nuevo `cartas.sql` en Supabase. Reinicia el backend si usas la base en memoria.
 
-Hoy hay 36 cartas (4 facciones × 9: 6 unidades y 3 hechizos cada una), con keywords `JUMPER` y `DISRUPTION`, robar cartas, daño, bonificaciones, "gloria" y hechizos lentos/rápidos/instantáneos. Recuerda que solo `JUMPER` y `DISRUPTION` tienen lógica como keywords; el resto de efectos se declaran en la columna `effects`.
+Hoy hay **116 cartas**: 4 facciones × 29 (20 unidades y 9 hechizos cada una; en total 80 unidades y 36 hechizos). Usan todos los disparadores (`ON_PLACED`, `ON_DESTROYED`, `ON_DAMAGE_TAKEN`, `ON_COMBAT_WIN`, `ON_MOVEMENT_CONFIRMED`), las acciones de daño, bonificación, robar, recuperarse, carga y marca de cazador, las keywords `JUMPER` y `DISRUPTION` y muchas con **varios efectos a la vez**. Recuerda que solo `JUMPER` y `DISRUPTION` tienen lógica como keywords; el resto de efectos se declaran en la columna `effects`.
 
 ## 🔐 Seguridad
 

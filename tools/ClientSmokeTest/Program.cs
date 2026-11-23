@@ -11,7 +11,7 @@ static class Program
 {
     class Result
     {
-        public string Outcome; public int Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant, Casts, TargetedCasts, MaxStack;
+        public string Outcome; public int BotSteps, Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant, Casts, TargetedCasts, MaxStack;
         public string DeckInfo = "";
         public string Score; public List<string> Problems = new List<string>();
     }
@@ -29,6 +29,7 @@ static class Program
         if (!SelfTests()) { Console.WriteLine("RESULTADO: FALLAN LAS AUTOPRUEBAS"); return 1; }
         var rnd = new Random(1234);
         if (deck.Equals("SECURITY", StringComparison.OrdinalIgnoreCase)) return await SecurityChecks(host);
+        if (deck.Equals("PVP", StringComparison.OrdinalIgnoreCase)) return await PvpChecks(host, games);
         for (int g = 1; g <= games; g++)
         {
             Result r;
@@ -36,8 +37,8 @@ static class Program
             catch (Exception e) { r = new Result { Outcome = "EXCEPCION", Score = "-" }; r.Problems.Add(e.ToString()); }
             bool fail = r.Outcome != "GAMEOVER" && r.Outcome != "STALLED" || r.Problems.Count > 0 || r.Invariant > 0;
             if (fail) bad++;
-            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10} hechizos={11}(conObjetivo={12}) pilaMax={13} {14}",
-                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant, r.Casts, r.TargetedCasts, r.MaxStack, r.DeckInfo);
+            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10} hechizos={11}(conObjetivo={12}) pilaMax={13} pasosBot={14} {15}",
+                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant, r.Casts, r.TargetedCasts, r.MaxStack, r.BotSteps, r.DeckInfo);
             foreach (var p in r.Problems.Take(6)) Console.WriteLine("      ! " + p);
         }
         Console.WriteLine(bad == 0 ? "RESULTADO: OK" : "RESULTADO: " + bad + " partida(s) con problemas");
@@ -199,7 +200,22 @@ static class Program
             for (int step = 0; step < 300; step++)
             {
                 if (GameRules.IsOver(s)) { res.Outcome = "GAMEOVER"; break; }
+                // El bot juega PASO A PASO (un estado por accion, con pausa): hasta que devuelva la prioridad llegan varios estados seguidos
+                for (int waits = 0; !GameRules.IsOver(s) && !s.activePlayer.hasPriority && waits < 600; waits++)
+                {
+                    object nm = await Next(inbox);
+                    if (nm is string) continue;                       // un aviso de error del servidor: sigo esperando el estado
+                    var gs = (GameStateDto)nm;
+                    if (gs.turn != lastTurn) pending.Clear();
+                    lastTurn = gs.turn;
+                    prev = s; s = gs;
+                    res.BotSteps++;
+                    var dl2 = StateDiff.Describe(prev, s); res.DiffLines += dl2.Count;
+                    if (s.spellStack != null && s.spellStack.Count > res.MaxStack) res.MaxStack = s.spellStack.Count;
+                    CheckInvariants(s, res);
+                }
                 var me = s.activePlayer;
+                if (GameRules.IsOver(s)) { res.Outcome = "GAMEOVER"; break; }
                 if (!me.hasPriority) { res.Outcome = "STUCK"; res.Problems.Add("sin prioridad tras recibir estado"); break; }
 
                 // --- decidir acción con las pistas del cliente
@@ -408,23 +424,41 @@ static class Program
             Check(!gotState.Task.IsCompleted, "y no se crea ninguna partida a nombre de otro");
         }
 
+        // suplantar en la cola online: A intenta ponerse en cola con el id de B
+        using (var ca = new GameConnection())
+        {
+            var gotStatus = new TaskCompletionSource<bool>(); var gotError = new TaskCompletionSource<string>();
+            ca.StatusReceived += st => gotStatus.TrySetResult(true);
+            ca.ErrorReceived += e => gotError.TrySetResult(e);
+            await ca.ConnectAsync(host, a.id, a.token);
+            var pump = Task.Run(async () => { for (int i = 0; i < 500; i++) { ca.Pump(); await Task.Delay(5); } });
+            var stompA = (StompClient)stompField.GetValue(ca);
+            await stompA.SendAsync("/app/game/joinQueue", Json.ToJson(new JoinQueueRequest { playerId = b.id, deckName = "AGGRO" }));
+            var first = await Task.WhenAny(gotError.Task, gotStatus.Task, Task.Delay(3000));
+            Check(first == gotError.Task && gotError.Task.Result.Contains("no coincide"), "joinQueue con el playerId de OTRO -> error 'no coincide'");
+            Check(!gotStatus.Task.IsCompleted, "y nadie entra en la cola a nombre de otro");
+        }
+
         // B juega una partida; A intenta pasar prioridad en la partida de B
         using (var cb = new GameConnection())
         using (var ca = new GameConnection())
         {
-            var bState = new TaskCompletionSource<GameStateDto>(); int bStates = 0;
-            cb.StateReceived += st => { bStates++; bState.TrySetResult(st); };
+            var bState = new TaskCompletionSource<GameStateDto>(); int bStates = 0; GameStateDto bLast = null;
+            cb.StateReceived += st => { bStates++; bLast = st; bState.TrySetResult(st); };
             var aError = new TaskCompletionSource<string>(); var aState = new TaskCompletionSource<bool>();
             ca.ErrorReceived += e => aError.TrySetResult(e);
             ca.StateReceived += st => aState.TrySetResult(true);
             await cb.ConnectAsync(host, b.id, b.token);
             await ca.ConnectAsync(host, a.id, a.token);
-            var pump = Task.Run(async () => { for (int i = 0; i < 800; i++) { cb.Pump(); ca.Pump(); await Task.Delay(5); } });
+            var pump = Task.Run(async () => { for (int i = 0; i < 2400; i++) { cb.Pump(); ca.Pump(); await Task.Delay(5); } });
             cb.StartLocalMatch("AGGRO", "AGGRO");
             var st0 = await Task.WhenAny(bState.Task, Task.Delay(4000)) == bState.Task ? bState.Task.Result : null;
             Check(st0 != null, "B inicia su partida");
             if (st0 != null)
             {
+                // el bot de B juega paso a paso y emite estados por su cuenta: esperamos a que B tenga la prioridad (el bot quieto)
+                for (int w = 0; w < 200 && (bLast == null || !bLast.activePlayer.hasPriority); w++) await Task.Delay(50);
+                Check(bLast != null && bLast.activePlayer.hasPriority, "B recupera la prioridad (el bot deja de jugar)");
                 int before = bStates;
                 var stompA = (StompClient)stompField.GetValue(ca);
                 await stompA.SendAsync("/app/game/passPriority", Json.ToJson(new PassPriorityRequest { gameId = st0.gameStateId, playerId = a.id }));
@@ -462,6 +496,217 @@ static class Program
         }
 
         Console.WriteLine(fails == 0 ? "SEGURIDAD: TODO OK" : "SEGURIDAD: " + fails + " comprobacion(es) FALLAN");
+        return fails == 0 ? 0 : 1;
+    }
+
+    // ------------------------------------------------------------------ partida ONLINE entre dos personas (dos clientes reales)
+    sealed class PvpAgent
+    {
+        public string Name, Id;
+        public GameConnection Conn;
+        public readonly BlockingCollection<GameStateDto> States = new BlockingCollection<GameStateDto>();
+        public readonly BlockingCollection<MatchStatusDto> Statuses = new BlockingCollection<MatchStatusDto>();
+        public readonly BlockingCollection<string> Errors = new BlockingCollection<string>();
+        public readonly List<string> ErrorLog = new List<string>();
+        public bool Dropped;
+        CancellationTokenSource _cts = new CancellationTokenSource();
+
+        public static async Task<PvpAgent> Create(string host)
+        {
+            var g = await RestApi.GuestAsync(host);
+            var a = new PvpAgent { Name = g.username, Id = g.id, Conn = new GameConnection() };
+            a.Conn.StateReceived += s => a.States.Add(s);
+            a.Conn.StatusReceived += st => a.Statuses.Add(st);
+            a.Conn.ErrorReceived += e => { a.ErrorLog.Add(e); a.Errors.Add(e); };
+            a.Conn.Disconnected += d => a.Dropped = true;
+            await a.Conn.ConnectAsync(host, g.id, g.token);
+            Task.Run(async () => { while (!a._cts.IsCancellationRequested) { try { a.Conn.Pump(); } catch { } await Task.Delay(3); } });
+            return a;
+        }
+        public async Task<MatchStatusDto> Status(string type, int ms = 6000)
+        {
+            return await Task.Run(() =>
+            {
+                var end = DateTime.UtcNow.AddMilliseconds(ms);
+                MatchStatusDto st;
+                while (DateTime.UtcNow < end) { if (Statuses.TryTake(out st, 200) && st.type == type) return st; }
+                return null;
+            });
+        }
+        public async Task<GameStateDto> State(int ms = 8000)
+        {
+            return await Task.Run(() => { GameStateDto s; return States.TryTake(out s, ms) ? s : null; });
+        }
+        public void Close() { _cts.Cancel(); Conn.Dispose(); }
+    }
+
+    /// <summary>Juega una partida como un jugador rapido hasta que acabe. Devuelve el ultimo estado visto.</summary>
+    static async Task<GameStateDto> PvpPlay(PvpAgent me, GameStateDto s, Random rnd, int maxSteps = 700)
+    {
+        var pending = new HashSet<string>();
+        int lastTurn = s.turn, failsInARow = 0;
+        for (int step = 0; step < maxSteps; step++)
+        {
+            if (GameRules.IsOver(s)) return s;
+            if (!s.activePlayer.hasPriority)
+            {
+                var ns = await me.State(15000);
+                if (ns == null) throw new Exception(me.Name + ": no llego ningun estado en 15 s (la partida se ha quedado parada)");
+                if (ns.turn != lastTurn) { pending.Clear(); lastTurn = ns.turn; }
+                s = ns; continue;
+            }
+            var mine = s.activePlayer;
+            string kind = "pass"; CardDto pick = null; Zone dest = Zone.Base; var targets = new List<string>();
+            var castable = mine.hand.Where(c => GameRules.IsSpell(c) && GameRules.PlayHint(s, c, pending) == null && Satisfiable(s, c)).ToList();
+            var playable = mine.hand.Where(c => GameRules.IsUnit(c) && GameRules.PlayHint(s, c, pending) == null).OrderByDescending(c => c.currentCost).ToList();
+            var movable = GameRules.CardsIn(mine, Zone.Base).Where(c => GameRules.MoveHint(s, c) == null).ToList();
+            if (failsInARow == 0)
+            {
+                if (castable.Count > 0 && rnd.Next(3) == 0) { kind = "cast"; pick = castable[rnd.Next(castable.Count)]; }
+                else if (playable.Count > 0) { kind = "play"; pick = playable[0]; }
+                else if (movable.Count > 0)
+                {
+                    kind = "move"; pick = movable.OrderByDescending(c => c.currentDrive).First();
+                    dest = GameRules.CardsIn(mine, Zone.Left).Count <= GameRules.CardsIn(mine, Zone.Right).Count ? Zone.Left : Zone.Right;
+                }
+                if (pick != null && (kind == "cast" || kind == "play")) targets = PickTargets(s, pick);
+            }
+            await Task.Delay(55);
+            switch (kind)
+            {
+                case "cast": case "play": me.Conn.PlayCard(pick.id, "MY_BASE", targets); break;
+                case "move": me.Conn.MoveCard(pick.id, GameRules.ToDestination(dest)); break;
+                default: me.Conn.PassPriority(); break;
+            }
+            // espero el estado resultante o un error
+            GameStateDto got = null; string err = null;
+            await Task.Run(() =>
+            {
+                var end = DateTime.UtcNow.AddSeconds(15);
+                while (DateTime.UtcNow < end && got == null && err == null)
+                {
+                    if (me.States.TryTake(out got, 50)) break;
+                    if (me.Errors.TryTake(out err, 0)) break;
+                }
+            });
+            if (err != null) { failsInARow++; if (failsInARow > 3) throw new Exception(me.Name + ": el servidor rechaza tambien pasar prioridad: " + err); continue; }
+            if (got == null) throw new Exception(me.Name + ": el servidor no respondio a '" + kind + "' en 15 s");
+            failsInARow = 0;
+            if (kind == "move") pending.Add(pick.id);
+            if (kind == "pass" || kind == "play" || kind == "cast" || got.turn != lastTurn) pending.Clear();
+            lastTurn = got.turn; s = got;
+        }
+        return s;
+    }
+
+    static async Task<int> PvpChecks(string host, int games)
+    {
+        int fails = 0;
+        void Check(bool ok, string what) { Console.WriteLine((ok ? "  [OK]    " : "  [FALLO] ") + what); if (!ok) fails++; }
+        var rnd = new Random();
+
+        async Task<Tuple<PvpAgent, PvpAgent, GameStateDto, GameStateDto>> Pair(string deckA, string deckB)
+        {
+            var a = await PvpAgent.Create(host); var b = await PvpAgent.Create(host);
+            a.Conn.JoinQueue(deckA);
+            if (await a.Status("QUEUED") == null) throw new Exception("A no recibio QUEUED");
+            b.Conn.JoinQueue(deckB);
+            if (await a.Status("MATCHED") == null || await b.Status("MATCHED") == null) throw new Exception("no hubo MATCHED para los dos");
+            var sa = await a.State(); var sb = await b.State();
+            if (sa == null || sb == null) throw new Exception("no llego el estado inicial a los dos");
+            return Tuple.Create(a, b, sa, sb);
+        }
+
+        for (int g = 1; g <= games; g++)
+        {
+            Console.WriteLine("PARTIDA ONLINE " + g);
+            var p = await Pair("AGGRO", "CONTROL");
+            PvpAgent A = p.Item1, B = p.Item2; GameStateDto sa = p.Item3, sb = p.Item4;
+            Check(!string.IsNullOrEmpty(sa.gameStateId) && sa.gameStateId == sb.gameStateId, "los dos juegan la MISMA partida");
+            Check(sa.activePlayer.id == A.Id && sb.activePlayer.id == B.Id, "cada uno se ve a si mismo como 'activePlayer' (su perspectiva)");
+            Check(sa.activePlayer.id != sb.activePlayer.id, "y son personas distintas");
+            Check(sa.activePlayer.hand != null && sa.activePlayer.hand.Count == 4 && sb.activePlayer.hand != null && sb.activePlayer.hand.Count == 4, "cada uno ve su mano de 4 cartas");
+            Check(sa.opponent.hand == null && sb.opponent.hand == null, "la mano del rival NO viaja (informacion oculta)");
+            Check(sa.activePlayer.hasPriority != sb.activePlayer.hasPriority, "solo uno empieza con la prioridad");
+
+            // el que NO tiene prioridad intenta actuar: el servidor debe rechazarlo
+            var waiting = sa.activePlayer.hasPriority ? B : A;
+            waiting.Conn.PassPriority();
+            await Task.Delay(700);
+            Check(waiting.Errors.Count > 0, "actuar sin tener la prioridad -> error del servidor (" + (waiting.ErrorLog.Count > 0 ? waiting.ErrorLog[0] : "sin error") + ")");
+            string e; while (waiting.Errors.TryTake(out e)) { }
+
+            var ta = PvpPlay(A, sa, rnd); var tb = PvpPlay(B, sb, rnd);
+            GameStateDto fa = null, fb = null; string crash = null;
+            try
+            {
+                var done = Task.WhenAll(ta, tb);
+                if (await Task.WhenAny(done, Task.Delay(TimeSpan.FromSeconds(150))) != done) crash = "la partida no termino en 150 s";
+                else { fa = ta.Result; fb = tb.Result; }
+            }
+            catch (Exception ex) { crash = ex.GetBaseException().Message; }
+            Check(crash == null, "la partida entre dos personas llega al final" + (crash != null ? " (" + crash + ")" : ""));
+            if (crash == null)
+            {
+                Check(GameRules.IsOver(fa) && GameRules.IsOver(fb), "los dos ven el final de la partida");
+                Check(fa.winnerId == fb.winnerId && !string.IsNullOrEmpty(fa.winnerId), "los dos coinciden en el ganador");
+                Check(fa.activePlayer.score == fb.opponent.score && fb.activePlayer.score == fa.opponent.score, "los marcadores coinciden vistos desde cada lado (" + fa.activePlayer.score + "-" + fa.opponent.score + ")");
+                Check(GameRules.IWon(fa) == (fa.winnerId == A.Id) && GameRules.IWon(fb) == (fb.winnerId == B.Id), "'he ganado' es coherente para cada uno");
+            }
+            A.Close(); B.Close();
+        }
+
+        Console.WriteLine("ABANDONAR");
+        {
+            var p = await Pair("AGGRO", "AGGRO"); PvpAgent A = p.Item1, B = p.Item2;
+            A.Conn.Concede();
+            var fa = await A.State(5000); var fb = await B.State(5000);
+            Check(fa != null && fb != null && GameRules.IsOver(fa) && GameRules.IsOver(fb), "al abandonar, la partida termina para los dos");
+            Check(fb != null && fb.winnerId == B.Id && GameRules.IWon(fb), "gana quien NO abandono");
+            A.Close(); B.Close();
+        }
+
+        Console.WriteLine("EMPEZAR OTRA BUSQUEDA CON UNA PARTIDA EN CURSO");
+        {
+            var p = await Pair("AGGRO", "AGGRO"); PvpAgent A = p.Item1, B = p.Item2;
+            A.Conn.JoinQueue("AGGRO");                        // A se pone a buscar otra partida sin haber acabado esta
+            var fb = await B.State(6000);
+            Check(fb != null && GameRules.IsOver(fb) && fb.winnerId == B.Id, "el rival se entera y gana (no se queda colgado esperando)");
+            A.Close(); B.Close();
+        }
+
+        Console.WriteLine("DESCONEXION BRUSCA");
+        {
+            var p = await Pair("CONTROL", "AGGRO"); PvpAgent A = p.Item1, B = p.Item2;
+            A.Close();                                        // cierra la conexion sin avisar (ventana cerrada, red caida...)
+            var fb = await B.State(8000);
+            Check(fb != null && GameRules.IsOver(fb) && fb.winnerId == B.Id, "si el rival se desconecta, ganas por abandono (" + (fb == null ? "no llego nada" : "winner=" + (fb.winnerId == B.Id ? "yo" : "otro")) + ")");
+            B.Close();
+        }
+
+        Console.WriteLine("COLA");
+        {
+            var c = await PvpAgent.Create(host);
+            c.Conn.JoinQueue("AGGRO");
+            Check(await c.Status("QUEUED") != null, "entrar en la cola avisa QUEUED");
+            c.Conn.LeaveQueue();
+            Check(await c.Status("LEFT") != null, "salir de la cola avisa LEFT");
+            var d = await PvpAgent.Create(host);
+            d.Conn.JoinQueue("AGGRO");
+            Check(await d.Status("QUEUED") != null && await d.Status("MATCHED", 1500) == null, "quien salio de la cola ya no se empareja con nadie");
+            var guest = await PvpAgent.Create(host);
+            guest.Conn.JoinQueue("MiMazoInventado");
+            await Task.Delay(700);
+            Check(guest.Errors.Count > 0, "un invitado con un mazo propio no entra en la cola (" + (guest.ErrorLog.Count > 0 ? guest.ErrorLog[0] : "sin error") + ")");
+            c.Close(); d.Close(); guest.Close();               // al cerrarse sus conexiones salen de la cola
+            await Task.Delay(800);
+            var self = await PvpAgent.Create(host);
+            self.Conn.JoinQueue("AGGRO"); self.Conn.JoinQueue("AGGRO");
+            Check(await self.Status("QUEUED") != null && await self.Status("MATCHED", 1200) == null, "pulsar 'buscar' dos veces no te empareja contigo mismo");
+            self.Close();
+        }
+
+        Console.WriteLine(fails == 0 ? "ONLINE: TODO OK" : "ONLINE: " + fails + " comprobacion(es) FALLAN");
         return fails == 0 ? 0 : 1;
     }
 
