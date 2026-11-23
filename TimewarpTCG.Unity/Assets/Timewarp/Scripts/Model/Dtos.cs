@@ -83,7 +83,7 @@ namespace TimewarpTCG
     }
 
     // ---------- Peticiones (cliente -> servidor) ----------
-    [Serializable] public class StartMatchRequest { public string playerId; public string deckName; }
+    [Serializable] public class StartMatchRequest { public string playerId; public string deckName; public string botDeck; }
     [Serializable] public class PassPriorityRequest { public string gameId; public string playerId; }
     [Serializable] public class MoveCardRequest { public string gameId; public string playerId; public string cardId; public string destination; }
     [Serializable]
@@ -94,4 +94,30 @@ namespace TimewarpTCG
     }
 
     [Serializable] public class UserDto { public string id; public string username; }
+
+    // ---------- Catálogo y mazos (MenuController) ----------
+    // El catálogo reutiliza CardDto: id = id de plantilla (p. ej. "U_AE_01"), currentCost/currentDrive = coste/drive base.
+    [Serializable] public class DeckEntryDto { public string cardId; public int quantity; }
+
+    [Serializable]
+    public class DeckDto
+    {
+        public string name;
+        public int total;
+        public List<string> factions = new List<string>();
+        public List<DeckEntryDto> cards = new List<DeckEntryDto>();
+    }
+
+    [Serializable]
+    public class SaveDeckRequest
+    {
+        public string userId;
+        public string deckName;
+        public List<DeckEntryDto> entries = new List<DeckEntryDto>();
+    }
+
+    [Serializable] public class ApiError { public string error; }
+    // JsonUtility no lee arrays JSON "sueltos": se envuelven como {"items":[...]}
+    [Serializable] public class CardList { public List<CardDto> items = new List<CardDto>(); }
+    [Serializable] public class DeckList { public List<DeckDto> items = new List<DeckDto>(); }
 }

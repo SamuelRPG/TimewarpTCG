@@ -11,29 +11,32 @@ static class Program
 {
     class Result
     {
-        public string Outcome; public int Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant;
+        public string Outcome; public int Turn, Actions, ServerErrors, HintTooOptimistic, HintTooStrict, DiffLines, Invariant, Casts, TargetedCasts, MaxStack;
+        public string DeckInfo = "";
         public string Score; public List<string> Problems = new List<string>();
     }
 
     static bool Verbose;
+    static string BotDeck = "RANDOM";
     static async Task<int> Main(string[] args)
     {
         Verbose = args.Length > 3 && args[3] == "v";
         string host = args.Length > 0 ? args[0] : "localhost:8080";
         string deck = args.Length > 1 ? args[1] : "AGGRO";
-        int games = args.Length > 2 ? int.Parse(args[2]) : 3;
+        int games = args.Length > 2 && int.TryParse(args[2], out var gg) ? gg : 3;
+        BotDeck = args.Length > 4 ? args[4] : "RANDOM";
         int bad = 0;
         if (!SelfTests()) { Console.WriteLine("RESULTADO: FALLAN LAS AUTOPRUEBAS"); return 1; }
         var rnd = new Random(1234);
         for (int g = 1; g <= games; g++)
         {
             Result r;
-            try { r = await PlayOne(host, deck, rnd); }
+            try { r = await PlayOne(host, deck, rnd, BotDeck); }
             catch (Exception e) { r = new Result { Outcome = "EXCEPCION", Score = "-" }; r.Problems.Add(e.ToString()); }
             bool fail = r.Outcome != "GAMEOVER" && r.Outcome != "STALLED" || r.Problems.Count > 0 || r.Invariant > 0;
             if (fail) bad++;
-            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10}",
-                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant);
+            Console.WriteLine("partida {0,2} [{1}] {2,-9} turno={3,3} puntos={4,-6} acciones={5,3} erroresServidor={6} pistaOptimista={7} pistaEstricta={8} lineasLog={9} invariantes={10} hechizos={11}(conObjetivo={12}) pilaMax={13} {14}",
+                g, deck, r.Outcome, r.Turn, r.Score, r.Actions, r.ServerErrors, r.HintTooOptimistic, r.HintTooStrict, r.DiffLines, r.Invariant, r.Casts, r.TargetedCasts, r.MaxStack, r.DeckInfo);
             foreach (var p in r.Problems.Take(6)) Console.WriteLine("      ! " + p);
         }
         Console.WriteLine(bad == 0 ? "RESULTADO: OK" : "RESULTADO: " + bad + " partida(s) con problemas");
@@ -111,10 +114,17 @@ static class Program
         return fails == 0;
     }
 
-    static async Task<Result> PlayOne(string host, string deck, Random rnd)
+    static async Task<Result> PlayOne(string host, string deck, Random rnd, string botDeck)
     {
         var res = new Result();
         string myId = Guid.NewGuid().ToString();
+        string deckName = deck;
+        if (deck.Equals("CUSTOM", StringComparison.OrdinalIgnoreCase))
+        {
+            // Flujo real del editor de mazos: registrar usuario, leer catálogo, guardar un mazo legal, jugar con él
+            var made = await MakeCustomDeck(host, rnd, res);
+            myId = made.Item1; deckName = made.Item2;
+        }
         var inbox = new BlockingCollection<object>();
         using (var conn = new GameConnection())
         {
@@ -125,7 +135,7 @@ static class Program
             var pump = Task.Run(async () => { while (!cts.IsCancellationRequested) { conn.Pump(); await Task.Delay(3); } });
 
             await conn.ConnectAsync(host, myId);
-            conn.StartLocalMatch(deck);
+            conn.StartLocalMatch(deckName, botDeck);
 
             GameStateDto prev = null, s = (GameStateDto)await Next(inbox);
             var pending = new HashSet<string>();
@@ -142,10 +152,11 @@ static class Program
                 // --- decidir acción con las pistas del cliente
                 string kind = "pass"; CardDto pick = null; Zone dest = Zone.Base;
 
-                var castable = me.hand.Where(c => GameRules.IsSpell(c) && GameRules.PlayHint(s, c, pending) == null && GameRules.TotalTargets(c) == 0).ToList();
+                List<string> targets = new List<string>();
+                var castable = me.hand.Where(c => GameRules.IsSpell(c) && GameRules.PlayHint(s, c, pending) == null && Satisfiable(s, c)).ToList();
                 var playable = me.hand.Where(c => GameRules.IsUnit(c) && GameRules.PlayHint(s, c, pending) == null).OrderByDescending(c => c.currentCost).ToList();
                 var movable = GameRules.CardsIn(me, Zone.Base).Where(c => GameRules.MoveHint(s, c) == null).ToList();
-                if (castable.Count > 0 && rnd.Next(3) == 0) { kind = "cast"; pick = castable[0]; }
+                if (castable.Count > 0 && rnd.Next(2) == 0) { kind = "cast"; pick = castable[rnd.Next(castable.Count)]; }
                 else if (playable.Count > 0) { kind = "play"; pick = playable[0]; }
                 else if (movable.Count > 0)
                 {
@@ -154,6 +165,7 @@ static class Program
                     dest = GameRules.CardsIn(me, Zone.Left).Count <= GameRules.CardsIn(me, Zone.Right).Count ? Zone.Left : Zone.Right;
                 }
                 else if (castable.Count > 0) { kind = "cast"; pick = castable[0]; }
+                if (pick != null && (kind == "cast" || kind == "play")) targets = PickTargets(s, pick);
 
                 // 1 de cada 8 pasos, intentar algo que la pista marca como ilegal para medir la fidelidad de las pistas
                 bool probe = false;
@@ -175,7 +187,10 @@ static class Program
 
                 switch (kind)
                 {
-                    case "play": case "cast": conn.PlayCard(pick.id, "MY_BASE", new List<string>()); break;
+                    case "play": case "cast":
+                        conn.PlayCard(pick.id, "MY_BASE", probe ? new List<string>() : targets);
+                        if (kind == "cast" && !probe) { res.Casts++; if (targets.Count > 0) res.TargetedCasts++; }
+                        break;
                     case "move": conn.MoveCard(pick.id, GameRules.ToDestination(dest)); break;
                     default: conn.PassPriority(); break;
                 }
@@ -196,7 +211,8 @@ static class Program
                 lastTurn = ns.turn;
 
                 prev = s; s = ns;
-                { var dl = StateDiff.Describe(prev, s); res.DiffLines += dl.Count; if (Verbose) { Console.WriteLine("   [" + kind + (pick != null ? " " + pick.name : "") + "] fase=" + s.gamePhase + " mano=" + string.Join(",", s.activePlayer.hand.Select(c => c.name.Substring(0, 4) + c.currentCost))); foreach (var l in dl) Console.WriteLine("      " + System.Text.RegularExpressions.Regex.Replace(l, "<[^>]+>", "")); } }
+                if (s.spellStack != null && s.spellStack.Count > res.MaxStack) res.MaxStack = s.spellStack.Count;
+                { var dl = StateDiff.Describe(prev, s); res.DiffLines += dl.Count; if (Verbose) { Console.WriteLine("   [" + kind + (pick != null ? " " + pick.name : "") + "] fase=" + s.gamePhase + " mano=" + string.Join(",", s.activePlayer.hand.Select(c => (c.cardType == "SPELL" ? "*" : "") + c.name.Substring(0, 4) + c.currentCost + (c.spellSpeed ?? "").Substring(0, 1)))); foreach (var l in dl) Console.WriteLine("      " + System.Text.RegularExpressions.Regex.Replace(l, "<[^>]+>", "")); } }
                 CheckInvariants(s, res);
                 if (probe && hint == null) { /* no debería ocurrir */ }
             }
@@ -217,6 +233,61 @@ static class Program
             try { await pump; } catch { }
         }
         return res;
+    }
+
+    // Elige objetivos como lo haría un jugador: el enemigo/aliado de más Drive para cada requisito.
+    static List<string> PickTargets(GameStateDto s, CardDto c)
+    {
+        var chosen = new List<string>();
+        foreach (var req in GameRules.Requirements(c))
+        {
+            var cands = new List<CardDto>();
+            foreach (var x in GameRules.Board(s.activePlayer)) if (GameRules.IsValidTarget(req.group, true)) cands.Add(x);
+            foreach (var x in GameRules.Board(s.opponent)) if (GameRules.IsValidTarget(req.group, false)) cands.Add(x);
+            cands = cands.Where(x => !chosen.Contains(x.id)).OrderByDescending(x => x.currentDrive).ToList();
+            for (int i = 0; i < req.count && i < cands.Count; i++) chosen.Add(cands[i].id);
+        }
+        return chosen;
+    }
+
+    static bool Satisfiable(GameStateDto s, CardDto c) { return PickTargets(s, c).Count == GameRules.TotalTargets(c); }
+
+    static async Task<Tuple<string, string>> MakeCustomDeck(string host, Random rnd, Result res)
+    {
+        var user = await RestApi.LoginOrRegisterAsync(host, "smoke_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        var cards = await RestApi.GetCardsAsync(host);
+        var factions = cards.Select(c => c.faction).Distinct().OrderBy(x => rnd.Next()).Take(2).ToList();
+        var pool = cards.Where(c => factions.Contains(c.faction)).ToList();
+        var counts = new Dictionary<string, int>();
+        int total = 0;
+        void Fill(List<CardDto> src, int target)
+        {
+            bool progress = true;
+            while (total < target && progress)
+            {
+                progress = false;
+                foreach (var c in src.OrderBy(x => rnd.Next()))
+                {
+                    int have = counts.ContainsKey(c.id) ? counts[c.id] : 0;
+                    int add = Math.Min(Math.Min(3 - have, target - total), 1 + rnd.Next(3));
+                    if (add <= 0) continue;
+                    counts[c.id] = have + add; total += add; progress = true;
+                    if (total >= target) break;
+                }
+            }
+        }
+        int spells = 8 + rnd.Next(5);
+        Fill(pool.Where(c => c.cardType == "UNIT").ToList(), 40 - spells);
+        Fill(pool.Where(c => c.cardType == "SPELL").ToList(), 40);
+        Fill(pool, 40);
+        var entries = counts.Select(kv => new DeckEntryDto { cardId = kv.Key, quantity = kv.Value }).ToList();
+        if (entries.Sum(e => e.quantity) != 40) throw new Exception("el agente no pudo montar un mazo de 40");
+        string name = "Smoke " + string.Join("+", factions.Select(f => f.Substring(0, 3)));
+        var saved = await RestApi.SaveDeckAsync(host, user.id, name, entries);
+        var listed = await RestApi.GetDecksAsync(host, user.id);
+        if (saved.total != 40 || !listed.Any(d => d.name == name && d.total == 40)) throw new Exception("el mazo guardado no aparece en la lista");
+        res.DeckInfo = "[mazo " + name + ": " + pool.Where(c => c.cardType == "SPELL" && counts.ContainsKey(c.id)).Sum(c => counts[c.id]) + " hechizos de 40]";
+        return Tuple.Create(user.id, name);
     }
 
     static async Task<object> Next(BlockingCollection<object> inbox)

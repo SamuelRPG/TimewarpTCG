@@ -52,9 +52,10 @@ namespace TimewarpTCG
 
         // ---------------------------------------------------------------- acciones
 
-        public void StartLocalMatch(string deckName)
+        /// <param name="botDeck">"RANDOM" (por defecto), "AGGRO" o "CONTROL".</param>
+        public void StartLocalMatch(string deckName, string botDeck = "RANDOM")
         {
-            Send("startLocalMatch", Json.ToJson(new StartMatchRequest { playerId = PlayerId, deckName = deckName }));
+            Send("startLocalMatch", Json.ToJson(new StartMatchRequest { playerId = PlayerId, deckName = deckName, botDeck = botDeck }));
         }
 
         public void PlayCard(string cardId, string destination, List<string> targetIds)
