@@ -98,7 +98,7 @@ public class GameController {
     @MessageMapping("/startLocalMatch")
     public void startMatch(@Payload StartMatchRequestDto request) {
         try {
-            GameState game = startMatchUseCase.executeLocalMatch(request.playerId, request.deckName);
+            GameState game = startMatchUseCase.executeLocalMatch(request.playerId, request.deckName, request.botDeck);
             processGameUpdate(game); // <-- USA EL HELPER
         } catch (Exception e) {
             // Si el mazo no existe, se lo notificamos al cliente para que no se quede colgado

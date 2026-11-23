@@ -8,6 +8,11 @@ public interface StartMatchUseCase {
     /**
      * Inicia una partida local usando un mazo preconstruido.
      */
-    GameState executeLocalMatch(UUID playerId, String chosenDeckName);
+    default GameState executeLocalMatch(UUID playerId, String chosenDeckName) {
+        return executeLocalMatch(playerId, chosenDeckName, "RANDOM");
+    }
+
+    /** botDeckName: "RANDOM" (mazo aleatorio legal del catalogo), "AGGRO" o "CONTROL". */
+    GameState executeLocalMatch(UUID playerId, String chosenDeckName, String botDeckName);
 
 }

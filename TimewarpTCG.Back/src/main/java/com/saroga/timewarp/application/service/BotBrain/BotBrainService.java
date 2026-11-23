@@ -100,7 +100,10 @@ public class BotBrainService {
         // Las unidades solo se pueden bajar en MAIN_OPEN (en COMBAT_* o MAIN_CLOSED el dominio lanza excepcion)
         Card cardToPlay = game.getGamePhase() == GamePhase.MAIN_OPEN ? getMostExpensivePlayableUnit(bot) : null;
         if (cardToPlay != null && bot.getBase().size() < 6) { // Recordamos el límite de 6 unidades
-            playCardUseCase.execute(game, bot.getPlayerId(), cardToPlay.getId(), CardLocation.MY_BASE, new ArrayList<>());
+            // Unidades con "al entrar" que piden objetivo (daño, bonificación...): elegimos objetivos como con un hechizo
+            List<Card> unitTargets = cardToPlay.getTargetingRequirements().isEmpty() ? null : getBestTargetsForSpell(game, bot, cardToPlay);
+            playCardUseCase.execute(game, bot.getPlayerId(), cardToPlay.getId(), CardLocation.MY_BASE,
+                    unitTargets != null ? unitTargets : new ArrayList<>());
             return;
         }
 
@@ -152,54 +155,31 @@ public class BotBrainService {
     }
 
     private List<Card> getBestTargetsForSpell(GameState game, PlayerState bot, Card spell) {
-        PlayerState human = game.getPlayerA();
-        List<Card> selectedTargets = new ArrayList<>();
+        PlayerState human = game.getOpponentOf(bot.getPlayerId());
+        List<Card> selected = new ArrayList<>();
 
-        // Si el hechizo no requiere objetivos (ej. robar cartas, ganar maná global)
-        if (spell.getTargetingRequirements().isEmpty()) {
-            return selectedTargets;
-        }
-
-        // Analizamos qué pide el hechizo
+        // Si el hechizo no requiere objetivos (ej. robar cartas) no hay nada que elegir
         for (TargetingRequirement req : spell.getTargetingRequirements()) {
-
-            // Si requiere apuntar a un ENEMIGO
-            if (req.targetGroup() == TargetGroup.ENEMY) {
-                // Buscamos la carta del humano con más vida en la mesa para destruirla
-                Card bestEnemy = human.getAllCardsOnBoard().stream()
-                        .max(Comparator.comparingInt(c -> c.getDrive().value()))
-                        .orElse(null);
-
-                if (bestEnemy != null) {
-                    selectedTargets.add(bestEnemy);
-                } else {
-                    return null; // No hay enemigos, el hechizo se cancela (no lo lanzamos)
+            List<Card> candidates;
+            switch (req.targetGroup()) {
+                case ENEMY -> candidates = new ArrayList<>(human.getAllCardsOnBoard());
+                case ALLY -> candidates = new ArrayList<>(bot.getAllCardsOnBoard());
+                case ANY_UNIT -> {
+                    candidates = new ArrayList<>(human.getAllCardsOnBoard());
+                    candidates.addAll(bot.getAllCardsOnBoard());
                 }
+                default -> { return null; }   // GLOBAL / LANE: el dominio no los valida
             }
-            // Si requiere apuntar a un ALIADO (Un buff de fuerza, por ejemplo)
-            else if (req.targetGroup() == TargetGroup.ALLY) {
-                // Buscamos a nuestro aliado con más vida para hacerlo aún más fuerte
-                Card bestAlly = bot.getAllCardsOnBoard().stream()
-                        .max(Comparator.comparingInt(c -> c.getDrive().value()))
-                        .orElse(null);
+            candidates.removeAll(selected);
+            candidates.removeIf(Card::isDestroyed);
+            // los mas fuertes primero (para dañar al mejor enemigo o reforzar al mejor aliado)
+            candidates.sort(Comparator.comparingInt((Card c) -> c.getDrive().value()).reversed());
 
-                if (bestAlly != null) {
-                    selectedTargets.add(bestAlly);
-                } else {
-                    return null; // No hay aliados en mesa, no desperdiciamos el hechizo
-                }
+            if (candidates.size() < req.requiredCount()) {
+                return null;   // no hay objetivos suficientes: no lanzamos el hechizo
             }
+            selected.addAll(candidates.subList(0, req.requiredCount()));
         }
-
-        // Comprobamos si hemos reunido todos los objetivos necesarios
-        int totalRequired = spell.getTargetingRequirements().stream()
-                .mapToInt(TargetingRequirement::requiredCount)
-                .sum();
-
-        if (selectedTargets.size() == totalRequired) {
-            return selectedTargets;
-        }
-
-        return null; // Falló la selección
+        return selected;
     }
 }

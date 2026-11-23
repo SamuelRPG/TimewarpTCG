@@ -7,12 +7,15 @@ import com.saroga.timewarp.application.ports.in.PlayerInGameActions.PlayCard.Pla
 import com.saroga.timewarp.application.ports.in.StartMatch.StartMatchUseCase;
 import com.saroga.timewarp.application.ports.out.DeckRepository.DeckRepositoryPort; // <-- AÑADIDO
 import com.saroga.timewarp.application.service.BotBrain.BotBrainService;
+import com.saroga.timewarp.application.service.BotDeck.BotDeckService;
 import com.saroga.timewarp.application.service.PlayerInGameActions.MoveCard.MoveCardService;
 import com.saroga.timewarp.application.service.PlayerInGameActions.PassPriority.PassPriorityService;
 import com.saroga.timewarp.application.service.PlayerInGameActions.PlayCard.PlayCardService;
 import com.saroga.timewarp.application.service.StartMatch.StartMatchService;
+import com.saroga.timewarp.domain.repository.cardCatalog.CardCatalogRepository;
 import com.saroga.timewarp.domain.service.CardPlayService;
 import com.saroga.timewarp.domain.service.CombatService;
+import com.saroga.timewarp.domain.service.DeckValidatorService;
 import com.saroga.timewarp.domain.service.GameFlowService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +25,14 @@ public class ApplicationConfig {
 
     // <-- AHORA INYECTAMOS DeckRepositoryPort AQUÍ
     @Bean
-    public StartMatchUseCase startMatchUseCase(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory) {
-        return new StartMatchService(deckRepositoryPort, deckFactory);
+    public StartMatchUseCase startMatchUseCase(DeckRepositoryPort deckRepositoryPort, DeckFactory deckFactory, BotDeckService botDeckService) {
+        return new StartMatchService(deckRepositoryPort, deckFactory, botDeckService);
+    }
+
+    @Bean
+    public BotDeckService botDeckService(CardCatalogRepository cardCatalogRepository, DeckFactory deckFactory,
+                                         DeckValidatorService deckValidatorService) {
+        return new BotDeckService(cardCatalogRepository, deckFactory, deckValidatorService);
     }
 
     @Bean
