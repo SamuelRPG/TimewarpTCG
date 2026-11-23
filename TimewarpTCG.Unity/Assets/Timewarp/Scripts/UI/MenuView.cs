@@ -38,14 +38,17 @@ namespace TimewarpTCG
             var bg = UiKit.Box(canvas, "Menu", UiKit.Bg, false, true);
             Root = bg.rectTransform;
             UiKit.Stretch(Root);
+            Deco.Backdrop(Root, new Color(0.10f, 0.14f, 0.28f), new Color(0.02f, 0.03f, 0.07f), new Color(0.25f, 0.42f, 1f, 0.22f), new Color(0.70f, 0.35f, 1f, 0.16f));
 
             var panel = UiKit.Box(Root, "Panel", UiKit.Panel);
             UiKit.Place(panel.rectTransform, 0.5f, 0.5f, 0, 0, 1000, 980);
 
             var title = UiKit.Label(panel.transform, "TIMEWARP TCG", 62, UiKit.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
             UiKit.Place(title.rectTransform, 0.5f, 1, 0, -14, 940, 80);
+            Deco.GoldTitle(title);
             var sub = UiKit.Label(panel.transform, "Partida de prueba contra el bot", 22, UiKit.Muted, TextAnchor.MiddleCenter);
             UiKit.Place(sub.rectTransform, 0.5f, 1, 0, -90, 940, 30);
+            Deco.Divider(panel.transform, new Color(UiKit.Gold.r, UiKit.Gold.g, UiKit.Gold.b, 0.65f), 0, -124, 760);
 
             // ---- servidor y cuenta
             Caption(panel.transform, "Servidor (backend en marcha)", -134, -260);
@@ -99,6 +102,7 @@ namespace TimewarpTCG
 
             _play = UiKit.MakeButton(panel.transform, "JUGAR CONTRA EL BOT", UiKit.Green, () => { if (OnPlay != null) OnPlay(); }, 32);
             UiKit.Place(_play.GetComponent<RectTransform>(), 0.5f, 1, 0, -706, 940, 90);
+            Deco.Halo(_play.targetGraphic, new Color(0.27f, 0.73f, 0.45f, 0.35f), 5f);   // el botón principal destaca
 
             _status = UiKit.Label(panel.transform, "", 20, UiKit.TextCol, TextAnchor.UpperCenter);
             UiKit.Place(_status.rectTransform, 0.5f, 1, 0, -806, 940, 90);

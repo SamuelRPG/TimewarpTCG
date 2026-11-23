@@ -36,6 +36,7 @@ namespace TimewarpTCG
             UiKit.Size(border.gameObject, w, h);
             border.gameObject.AddComponent<CanvasGroup>();
             UiKit.OnClick(border.gameObject, onClick, onEnter, onExit);
+            Deco.DropShadow(border, 0.45f, 5f);      // da relieve: la carta "se despega" del tablero
 
             if (st.selected) UiKit.AddOutline(border, UiKit.Gold, 4f);
             else if (st.hasOutline) UiKit.AddOutline(border, st.outline, 3f);
@@ -63,6 +64,13 @@ namespace TimewarpTCG
             art.type = Image.Type.Simple;
             art.preserveAspect = false;
             UiKit.Place(art.rectTransform, 0, 1, pad, -pad, innerW - 2 * pad, artH);
+            Deco.Safe(() =>
+            {
+                // brillo suave sobre la mitad alta de la ilustración (acabado "carta brillante")
+                var gloss = UiKit.Box(inner.transform, "Gloss", new Color(1f, 1f, 1f, 0.20f), false, false);
+                UiKit.Place(gloss.rectTransform, 0, 1, pad, -pad, innerW - 2 * pad, artH * 0.55f);
+                Deco.Gradient(gloss, Color.white, new Color(1f, 1f, 1f, 0f));
+            }, "brillo de carta");
 
             // ---- banda del nombre (sobre el borde inferior de la ilustración)
             float bandH = 24 * k;

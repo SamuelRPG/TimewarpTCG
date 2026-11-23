@@ -46,7 +46,17 @@ namespace TimewarpTCG
             {
                 if (_font == null)
                 {
-                    try { _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch (Exception) { }   // Unity 2022.2+
+                    // En Windows se prefiere Segoe UI (más moderna que Arial). Si no existe o falla, se usa la fuente integrada de siempre.
+                    if (Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer)
+                    {
+                        try
+                        {
+                            if (Array.IndexOf(Font.GetOSInstalledFontNames(), "Segoe UI") >= 0)
+                                _font = Font.CreateDynamicFontFromOSFont("Segoe UI", 16);
+                        }
+                        catch (Exception) { _font = null; }
+                    }
+                    if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch (Exception) { } }   // Unity 2022.2+
                     if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch (Exception) { } }   // Unity antiguo
                     if (_font == null) _font = Font.CreateDynamicFontFromOSFont(new[] { "Arial", "Helvetica", "DejaVu Sans", "Liberation Sans" }, 16);
                 }
@@ -169,6 +179,8 @@ namespace TimewarpTCG
             if (rounded) { img.sprite = Rounded; img.type = Image.Type.Sliced; }
             img.color = color;
             img.raycastTarget = raycast;
+            // los paneles grandes (colores Panel / Panel2) reciben el aspecto de la capa de diseño: degradado, borde de luz y sombra
+            if (rounded && (color == Panel || color == Panel2)) Deco.Panelize(img);
             return img;
         }
 
@@ -200,8 +212,11 @@ namespace TimewarpTCG
         public static Button MakeButton(Transform parent, string text, Color bg, Action onClick, int fontSize = 20, string name = "Button")
         {
             var img = Box(parent, name, bg);
+            Deco.Buttonize(img);
             var btn = img.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
+            // IMPORTANTE: después del Button, para que HoverFx encuentre su Selectable (y respete "interactable")
+            Deco.Safe(() => img.gameObject.AddComponent<HoverFx>(), "efecto de botón");
             var cb = btn.colors;
             cb.normalColor = Color.white;
             cb.highlightedColor = new Color(0.88f, 0.9f, 1f, 1f);
@@ -220,6 +235,7 @@ namespace TimewarpTCG
         public static InputField MakeInput(Transform parent, string placeholder, string initial, int fontSize = 20)
         {
             var bg = Box(parent, "Input", C(10, 13, 22));
+            Deco.Safe(() => AddOutline(bg, new Color(1f, 1f, 1f, 0.12f), 1f), "borde de campo");
             var input = bg.gameObject.AddComponent<InputField>();
             input.targetGraphic = bg;
 

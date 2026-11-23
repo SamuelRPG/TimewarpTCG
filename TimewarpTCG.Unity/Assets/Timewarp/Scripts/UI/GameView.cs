@@ -35,6 +35,7 @@ namespace TimewarpTCG
         Image _phaseBadge;
         ZoneUi _oppBase, _oppLeft, _oppRight, _myBase, _myLeft, _myRight;
         Text _oppInfo, _myInfo, _laneLeftHdr, _laneRightHdr, _handTitle;
+        Deco.GemBar _oppRes, _myRes, _oppPts, _myPts;     // gemas de recurso y puntos de cada jugador
         RectTransform _hand;
         Text _inspector, _stackText, _log;
         ScrollRect _logScroll;
@@ -81,6 +82,7 @@ namespace TimewarpTCG
             var bg = UiKit.Box(canvas, "Game", UiKit.Bg, false, true);
             Root = bg.rectTransform;
             UiKit.Stretch(Root);
+            Deco.Backdrop(Root, new Color(0.10f, 0.14f, 0.28f), new Color(0.02f, 0.03f, 0.07f), new Color(0.25f, 0.42f, 1f, 0.22f), new Color(0.70f, 0.35f, 1f, 0.16f));
 
             BuildAmbient();
             BuildHud();
@@ -150,6 +152,7 @@ namespace TimewarpTCG
 
             _hudTurn = UiKit.Label(hud.transform, "TURNO 1", 34, UiKit.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             UiKit.Place(_hudTurn.rectTransform, 0, 0.5f, 16, 0, 230, 50);
+            Deco.TextShadow(_hudTurn);
 
             _phaseBadge = UiKit.Box(hud.transform, "PhaseBadge", UiKit.Blue, true, false);
             UiKit.Place(_phaseBadge.rectTransform, 0, 0.5f, 250, 0, 300, 40);
@@ -162,6 +165,8 @@ namespace TimewarpTCG
 
             _hudScore = UiKit.Label(hud.transform, "", 34, UiKit.TextCol, TextAnchor.MiddleRight, FontStyle.Bold);
             UiKit.Place(_hudScore.rectTransform, 1, 0.5f, -16, 8, 400, 40);
+            Deco.TextShadow(_hudScore);
+            Deco.Divider(hud.transform, new Color(UiKit.Gold.r, UiKit.Gold.g, UiKit.Gold.b, 0.45f), 0, 0, 1500, 0.5f, 0f);   // filo dorado bajo la barra
             _hudGoal = UiKit.Label(hud.transform, "Meta: 10 puntos y 2 de ventaja", 14, UiKit.Muted, TextAnchor.MiddleRight);
             UiKit.Place(_hudGoal.rectTransform, 1, 0.5f, -16, -18, 400, 20);
         }
@@ -198,6 +203,7 @@ namespace TimewarpTCG
             z.baseColor = mine ? new Color32(24, 38, 70, 255) : new Color32(46, 28, 38, 255);
             z.bg = UiKit.Box(region, (mine ? "My" : "Opp") + zone, z.baseColor);
             UiKit.Stretch(z.bg.rectTransform);
+            Deco.Panelize(z.bg, 0.24f, true, false);
             if (titleVisible)
             {
                 var t = UiKit.Label(z.bg.transform, title, 13, UiKit.Muted, TextAnchor.UpperLeft, FontStyle.Bold);
@@ -215,15 +221,27 @@ namespace TimewarpTCG
         {
             var b = UiKit.Box(region, "Info", UiKit.Panel);
             UiKit.Stretch(b.rectTransform);
-            var t = UiKit.Label(b.transform, "", 16, UiKit.TextCol, TextAnchor.MiddleLeft);
-            UiKit.Stretch(t.rectTransform, 10, 4, 6, 4);
+            var t = UiKit.Label(b.transform, "", 16, UiKit.TextCol, TextAnchor.UpperLeft);   // arriba: abajo van las barras de gemas
+            UiKit.Stretch(t.rectTransform, 10, 6, 6, 4);
             return t;
+        }
+
+        /// <summary>Dos filas de gemas bajo el texto del jugador: recurso disponible (azul, 10 como máximo) y puntos (dorado, la meta es 10).</summary>
+        void AddBars(Text info, out Deco.GemBar res, out Deco.GemBar pts)
+        {
+            Transform box = info.transform.parent;
+            Color off = new Color32(30, 38, 62, 255);
+            res = Deco.GemBar.Create(box, 10, 16, 4, new Color32(80, 150, 245, 255), off, true);
+            UiKit.Place(res.Root, 0, 0, 12, 34, res.Width, 16);
+            pts = Deco.GemBar.Create(box, 10, 20, 3, UiKit.Gold, off, false);
+            UiKit.Place(pts.Root, 0, 0, 12, 10, pts.Width, 14);
         }
 
         void BuildBoard()
         {
             // fila del rival
             _oppInfo = InfoBox(UiKit.Region(Root, "OppInfoR", 0.185f, 0.07f, 0.33f, 0.235f));
+            AddBars(_oppInfo, out _oppRes, out _oppPts);
             _oppBase = MakeZone(UiKit.Region(Root, "OppBaseR", 0.33f, 0.07f, 1f, 0.235f), "BASE DEL BOT", false, Zone.Base);
 
             // carriles: cabecera + zona rival + zona propia
@@ -237,6 +255,7 @@ namespace TimewarpTCG
 
             // fila propia
             _myInfo = InfoBox(UiKit.Region(Root, "MyInfoR", 0.185f, 0.595f, 0.33f, 0.76f));
+            AddBars(_myInfo, out _myRes, out _myPts);
             _myBase = MakeZone(UiKit.Region(Root, "MyBaseR", 0.33f, 0.595f, 1f, 0.76f), "TU BASE", true, Zone.Base);
         }
 
@@ -251,6 +270,7 @@ namespace TimewarpTCG
         {
             var handBox = UiKit.Box(UiKit.Region(Root, "HandR", 0.185f, 0.765f, 0.8f, 1f), "Hand", new Color(0.09f, 0.11f, 0.18f, 0.55f));
             UiKit.Stretch(handBox.rectTransform);
+            Deco.Panelize(handBox, 0.30f, true, false);
             _handBox = handBox.rectTransform;
             _handTitle = UiKit.Label(handBox.transform, "TU MANO", 13, UiKit.Muted, TextAnchor.UpperLeft, FontStyle.Bold);
             UiKit.Place(_handTitle.rectTransform, 0, 1, 8, -3, 400, 18);
@@ -268,11 +288,13 @@ namespace TimewarpTCG
 
             _primaryBtn = UiKit.MakeButton(act.transform, "CONFIRMAR", UiKit.Green, OnPrimary, 18);
             UiKit.Place(_primaryBtn.GetComponent<RectTransform>(), 0, 1, 10, -114, 178, 40);
+            Deco.Halo(_primaryBtn.targetGraphic, new Color(0.27f, 0.73f, 0.45f, 0.30f), 3f);
             _cancelBtn = UiKit.MakeButton(act.transform, "CANCELAR", UiKit.PanelLight, () => { ClearSelection(); Render(); }, 18);
             UiKit.Place(_cancelBtn.GetComponent<RectTransform>(), 1, 1, -10, -114, 178, 40);
 
             _passBtn = UiKit.MakeButton(act.transform, "PASAR PRIORIDAD", UiKit.Blue, DoPass, 22);
             UiKit.Place(_passBtn.GetComponent<RectTransform>(), 0.5f, 0, 0, 10, 368, 66);
+            Deco.Halo(_passBtn.targetGraphic, new Color(0.31f, 0.55f, 0.92f, 0.30f), 4f);
         }
 
         void BuildOverlays()
@@ -558,6 +580,7 @@ namespace TimewarpTCG
             // --- info jugadores
             _oppInfo.text = Info(op, "BOT", UiKit.Red);
             _myInfo.text = Info(me, "TÚ", UiKit.Blue);
+            if (_myRes != null) { _myRes.Set(me.resource); _myPts.Set(me.score); _oppRes.Set(op.resource); _oppPts.Set(op.score); }
 
             // --- carriles
             _laneLeftHdr.text = LaneTitle("CARRIL IZQUIERDO", GameRules.Contested(s, Zone.Left));

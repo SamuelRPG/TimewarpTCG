@@ -47,6 +47,7 @@ namespace TimewarpTCG
             var bg = UiKit.Box(canvas, "DeckBuilder", UiKit.Bg, false, true);
             Root = bg.rectTransform;
             UiKit.Stretch(Root);
+            Deco.Backdrop(Root, new Color(0.10f, 0.14f, 0.28f), new Color(0.02f, 0.03f, 0.07f), new Color(0.25f, 0.42f, 1f, 0.22f), new Color(0.70f, 0.35f, 1f, 0.16f));
             Root.gameObject.SetActive(false);   // oculta desde el principio: si algo fallase al construir, no queda una pantalla a medias
             BuildHeader();
             BuildFilters();
@@ -63,6 +64,7 @@ namespace TimewarpTCG
             UiKit.Stretch(bar.rectTransform);
             var title = UiKit.Label(bar.transform, "EDITOR DE MAZOS", 34, UiKit.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             UiKit.Place(title.rectTransform, 0, 0.5f, 20, 0, 420, 50);
+            Deco.GoldTitle(title);
 
             var lbl = UiKit.Label(bar.transform, "Nombre:", 20, UiKit.Muted, TextAnchor.MiddleRight);
             UiKit.Place(lbl.rectTransform, 0, 0.5f, 450, 0, 100, 40);
