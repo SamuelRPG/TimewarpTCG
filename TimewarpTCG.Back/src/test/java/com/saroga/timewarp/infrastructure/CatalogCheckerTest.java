@@ -37,7 +37,12 @@ public class CatalogCheckerTest {
     @Test
     void theRealCatalogIsClean_andEveryCardBuilds() {
         var all = repository.findAll();
-        assertEquals(36, all.size(), "data.sql debe cargar las 36 cartas");
+        assertEquals(116, all.size(), "data.sql debe cargar las 116 cartas");
+        for (String f : new String[]{"ANCIENT_EGYPT", "ROMANS", "STEAMPUNK", "GLITCHPOP"}) {
+            assertEquals(29, all.stream().filter(c -> f.equals(c.getFaction())).count(), "29 cartas de " + f + " (20 nuevas + 9 de antes)");
+        }
+        assertEquals(80, all.stream().filter(c -> "UNIT".equals(c.getCardType())).count(), "80 unidades (24 de antes + 56 nuevas)");
+        assertEquals(36, all.stream().filter(c -> "SPELL".equals(c.getCardType())).count(), "36 hechizos (12 de antes + 24 nuevos)");
         for (CardTemplateEntity e : all) {
             assertEquals(List.of(), CatalogChecker.check(e), e.getId());
             assertNotNull(mapper.toDomain(e), "la carta debe poder construirse como en una partida: " + e.getId());
