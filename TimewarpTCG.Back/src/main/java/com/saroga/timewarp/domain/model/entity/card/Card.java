@@ -112,12 +112,15 @@ public class Card {
 
         this.drive = drive.decrease(amount);
 
-        // Notificar a los efectos que hemos recibido daño (por si alguno salta)
-        effects.forEach(e -> e.onDamageTaken(game, this, amount));
-
         if (this.drive.isZero()) {
+            // Daño letal: la unidad muere y NO dispara "al recibir daño". Antes se avisaba a los efectos primero, y un
+            // SELF_BUFF le devolvia Drive antes de comprobar la muerte ("Si sobrevive al daño, gana +2" la salvaba).
             this.destroy(game);
+            return;
         }
+
+        // Sobrevive: notificar a los efectos que ha recibido daño (por si alguno salta)
+        effects.forEach(e -> e.onDamageTaken(game, this, amount));
     }
 
     public void onPlaced(GameState game, PlayerState player, PlayerState opponent, CardLocation location, List<Card> targets) {

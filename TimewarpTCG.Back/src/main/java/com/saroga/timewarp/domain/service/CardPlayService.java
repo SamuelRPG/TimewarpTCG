@@ -65,6 +65,7 @@ public class CardPlayService {
 
         if (card.isUnit()) {
             validateUnitRequirements(gameState, card, destination, isFieldContested);
+            validateUnitTargets(gameState, card, targets);
         } else if (card.isSpell()) {
             validateSpellRequirements(gameState, card, targets);
         }
@@ -97,7 +98,58 @@ public class CardPlayService {
 
     private void validateSpellRequirements(GameState gameState, Card card, List<Card> targets) {
         validateTiming(card, gameState);
+        validateTargetsAreUnitsInPlay(gameState, targets);
         validateTargets(card, targets);
+    }
+
+    /**
+     * Objetivos de una UNIDAD (su efecto ON_PLACED). Es el servidor quien manda: un cliente modificado no puede
+     * llevarse mas objetivos de los que dice la carta ni elegir cartas que no esten en juego.
+     * Elegir MENOS objetivos de los que pide la carta se permite (el efecto simplemente no afecta a nadie): asi una
+     * unidad se puede bajar aunque no haya objetivos validos.
+     */
+    private void validateUnitTargets(GameState gameState, Card card, List<Card> targets) {
+        List<TargetingRequirement> reqs = card.getTargetingRequirements();
+        if (reqs.isEmpty()) {
+            if (!targets.isEmpty()) throw new IllegalStateException("Esta unidad no pide objetivos.");
+            return;
+        }
+        validateTargetsAreUnitsInPlay(gameState, targets);
+        int totalRequired = reqs.stream().mapToInt(TargetingRequirement::requiredCount).sum();
+        if (targets.size() > totalRequired) {
+            throw new IllegalStateException("Has elegido mas objetivos de los que pide la carta (" + totalRequired + ").");
+        }
+        // cada objetivo debe encajar en algun grupo que pide la carta...
+        for (Card t : targets) {
+            boolean fits = reqs.stream().anyMatch(r -> matchesGroup(t, card.getOwnerId(), r.targetGroup()));
+            if (!fits) throw new IllegalStateException("Uno de los objetivos no es valido para esta carta.");
+        }
+        // ...y no puede haber mas aliados (o enemigos) de los que pide la carta
+        int allowedAllies = reqs.stream().filter(r -> r.targetGroup() == TargetGroup.ALLY || r.targetGroup() == TargetGroup.ANY_UNIT)
+                .mapToInt(TargetingRequirement::requiredCount).sum();
+        int allowedEnemies = reqs.stream().filter(r -> r.targetGroup() == TargetGroup.ENEMY || r.targetGroup() == TargetGroup.ANY_UNIT)
+                .mapToInt(TargetingRequirement::requiredCount).sum();
+        long allies = targets.stream().filter(t -> t.getOwnerId().equals(card.getOwnerId())).count();
+        long enemies = targets.size() - allies;
+        if (allies > allowedAllies || enemies > allowedEnemies) {
+            throw new IllegalStateException("Los objetivos elegidos no coinciden con los que pide la carta.");
+        }
+    }
+
+    /** Un objetivo debe ser una unidad en juego (Base o carriles), viva y sin repetir: no vale una carta de la mano o del cementerio. */
+    private void validateTargetsAreUnitsInPlay(GameState gameState, List<Card> targets) {
+        java.util.Set<java.util.UUID> inPlay = new java.util.HashSet<>();
+        gameState.getPlayerA().getAllCardsOnBoard().forEach(c -> inPlay.add(c.getId()));
+        gameState.getPlayerB().getAllCardsOnBoard().forEach(c -> inPlay.add(c.getId()));
+        java.util.Set<java.util.UUID> seen = new java.util.HashSet<>();
+        for (Card t : targets) {
+            if (t == null || !inPlay.contains(t.getId()) || t.isDestroyed()) {
+                throw new IllegalStateException("Los objetivos deben ser unidades en juego.");
+            }
+            if (!seen.add(t.getId())) {
+                throw new IllegalStateException("No puedes elegir la misma unidad dos veces.");
+            }
+        }
     }
 
     private void validateTargets(Card card, List<Card> targets) {
