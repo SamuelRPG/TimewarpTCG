@@ -54,15 +54,25 @@ namespace TimewarpTCG
 
                 _menu = new MenuView(_canvas.transform);
                 _game = new GameView(_canvas.transform);
-                _builder = new DeckBuilderView(_canvas.transform);
+
+                // Pantallas SECUNDARIAS: si una falla al construirse, se registra el error pero el juego sigue funcionando
+                try
+                {
+                    _builder = new DeckBuilderView(_canvas.transform);
+                    _builder.OnClose = decks =>
+                    {
+                        _decks = decks ?? _decks;
+                        _menu.SetDecks(_decks);
+                        _menu.Show(true);
+                    };
+                }
+                catch (Exception e)
+                {
+                    _builder = null;
+                    Debug.LogError("[Timewarp] El editor de mazos no se pudo construir (el resto del juego funciona):\n" + e);
+                }
                 _help = new HelpView(_canvas.transform);
 
-                _builder.OnClose = decks =>
-                {
-                    _decks = decks ?? _decks;
-                    _menu.SetDecks(_decks);
-                    _menu.Show(true);
-                };
                 _menu.OnLogin = name => { var _ = LoginAsync(name, true); };
                 _menu.OnEditDecks = () => { var _ = EditDecksAsync(); };
                 _menu.OnPlay = OnPlayClicked;
@@ -199,6 +209,7 @@ namespace TimewarpTCG
         {
             if (_screen != AppScreen.Menu) return;
             string host = _menu.Host;
+            if (_builder == null) { _menu.SetStatus("El editor de mazos no está disponible (mira la consola de Unity).", true); return; }
             if (!HasSession(host))
             {
                 if (!await LoginAsync(_menu.Username, false))

@@ -47,6 +47,7 @@ namespace TimewarpTCG
             var bg = UiKit.Box(canvas, "DeckBuilder", UiKit.Bg, false, true);
             Root = bg.rectTransform;
             UiKit.Stretch(Root);
+            Root.gameObject.SetActive(false);   // oculta desde el principio: si algo fallase al construir, no queda una pantalla a medias
             BuildHeader();
             BuildFilters();
             BuildGrid();
@@ -107,11 +108,8 @@ namespace TimewarpTCG
         void BuildGrid()
         {
             RectTransform content;
-            var scroll = UiKit.MakeScroll(UiKit.Region(Root, "GridR", 0, 0.165f, 0.645f, 1f, 2), UiKit.Panel, out content, "CardGrid");
+            var scroll = UiKit.MakeScroll(UiKit.Region(Root, "GridR", 0, 0.165f, 0.645f, 1f, 2), UiKit.Panel, out content, "CardGrid", false);
             UiKit.Stretch(scroll.GetComponent<RectTransform>());
-            // sustituimos el VerticalLayoutGroup por una cuadrícula
-            var vlg = content.GetComponent<VerticalLayoutGroup>();
-            if (vlg != null) UnityEngine.Object.Destroy(vlg);
             var gl = content.gameObject.AddComponent<GridLayoutGroup>();
             gl.cellSize = new Vector2(150, 210);
             gl.spacing = new Vector2(12, 14);
@@ -335,6 +333,7 @@ namespace TimewarpTCG
 
         void RebuildGrid()
         {
+            if (_grid == null) return;
             UiKit.ClearChildren(_grid);
             _cells.Clear();
             var list = _catalog.Where(Passes).OrderBy(c => c.faction).ThenBy(c => c.currentCost).ThenBy(c => c.name).ToList();

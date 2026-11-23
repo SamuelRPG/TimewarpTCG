@@ -240,7 +240,7 @@ namespace TimewarpTCG
         }
 
         /// <summary>Zona con scroll vertical. Devuelve el ScrollRect y el contenedor donde añadir hijos.</summary>
-        public static ScrollRect MakeScroll(Transform parent, Color bg, out RectTransform content, string name = "Scroll")
+        public static ScrollRect MakeScroll(Transform parent, Color bg, out RectTransform content, string name = "Scroll", bool verticalList = true)
         {
             var root = Box(parent, name, bg);
             var sr = root.gameObject.AddComponent<ScrollRect>();
@@ -252,10 +252,15 @@ namespace TimewarpTCG
             content = NewRect("Content", vp);
             content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1);
             content.offsetMin = new Vector2(0, 0); content.offsetMax = new Vector2(0, 0);
-            var v = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            v.childControlWidth = true; v.childControlHeight = true;
-            v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-            v.padding = new RectOffset(6, 6, 4, 4);
+            // verticalList=false: el llamador añadirá su propio LayoutGroup (un objeto solo admite UNO; y Destroy es diferido,
+            // así que "quitar el vertical y añadir uno de cuadrícula" en el mismo fotograma falla).
+            if (verticalList)
+            {
+                var v = content.gameObject.AddComponent<VerticalLayoutGroup>();
+                v.childControlWidth = true; v.childControlHeight = true;
+                v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+                v.padding = new RectOffset(6, 6, 4, 4);
+            }
             var fit = content.gameObject.AddComponent<ContentSizeFitter>();
             fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
@@ -298,6 +303,7 @@ namespace TimewarpTCG
 
         public static void ClearChildren(Transform t)
         {
+            if (t == null) return;
             for (int i = t.childCount - 1; i >= 0; i--)
             {
                 var c = t.GetChild(i);
