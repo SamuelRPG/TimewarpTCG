@@ -17,7 +17,9 @@ public class DrawCardAction implements Action {
 
     //la lista de targets estara vacia en esta accion
     public void execute(GameState game,Card card, List<Card> targets) {
-        UUID ownerId = card.getOwnerId();
-
+        PlayerState owner = game.getPlayerById(card.getOwnerId());
+        for (int i = 0; i < amount; i++) {
+            owner.drawCard();
+        }
     }
 }

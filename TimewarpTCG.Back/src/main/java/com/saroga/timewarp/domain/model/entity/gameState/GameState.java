@@ -65,7 +65,29 @@ public class GameState {
         }
 
         spellStack.clear();
+        cleanupDestroyed();
         openCurrentPhase();
+    }
+
+    /**
+     * Retira del tablero las unidades marcadas como destruidas por un efecto (hechizo, ON_PLACED, etc.).
+     * El combate ya las retira con PlayerState.destroyCard; los efectos solo las marcaban, y se quedaban
+     * en el tablero (seguian puntuando y disputando carriles).
+     */
+    public void cleanupDestroyed() {
+        for (PlayerState p : List.of(playerA, playerB)) {
+            for (CardLocation loc : List.of(CardLocation.MY_BASE, CardLocation.FIELD_LEFT, CardLocation.FIELD_RIGHT)) {
+                List<Card> zone = p.getUnitsIn(loc);
+                List<Card> dead = new ArrayList<>();
+                for (Card c : zone) { if (c.isDestroyed()) dead.add(c); }
+                for (Card c : dead) {
+                    zone.remove(c);
+                    p.getGraveyard().add(c);
+                    c.setCardLocation(CardLocation.GRAVEYARD);
+                    p.getPendingMoves().remove(c);
+                }
+            }
+        }
     }
 
     public boolean isStackEmpty() {

@@ -12,6 +12,12 @@ import java.util.UUID;
 public class GameFlowService {
 
     public void confirmMoveAndPassPriority(GameState gameState, UUID playerId, CombatService combatService) {
+        applyConfirmMoveAndPass(gameState, playerId, combatService);
+        // cualquier efecto disparado (movimiento confirmado, pila resuelta...) pudo destruir unidades
+        gameState.cleanupDestroyed();
+    }
+
+    private void applyConfirmMoveAndPass(GameState gameState, UUID playerId, CombatService combatService) {
         PlayerState actor = gameState.getPlayerById(playerId);
 
         if (!actor.hasPriority()) {

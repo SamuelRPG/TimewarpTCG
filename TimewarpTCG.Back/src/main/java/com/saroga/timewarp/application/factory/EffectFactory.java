@@ -3,6 +3,7 @@ package com.saroga.timewarp.application.factory;
 import com.saroga.timewarp.domain.model.effect.action.Action;
 import com.saroga.timewarp.domain.model.effect.action.allyBoost.AllyBoostAction;
 import com.saroga.timewarp.domain.model.effect.action.charge.ChargeAction;
+import com.saroga.timewarp.domain.model.effect.action.drawCard.DrawCardAction;
 import com.saroga.timewarp.domain.model.effect.action.enemyDamage.EnemyDamageAction;
 import com.saroga.timewarp.domain.model.effect.action.hunterMark.HunterMarkAction;
 import com.saroga.timewarp.domain.model.effect.action.readySelf.ReadySelfAction;
@@ -30,6 +31,7 @@ public class EffectFactory {
         actionRegistry.put("SELF_BUFF",    value -> new SelfBuffAction(Drive.of(value)));
         actionRegistry.put("CHARGE_BUFF", value -> new ChargeAction(Drive.of(value)));
         actionRegistry.put("READY_SELF", value -> new ReadySelfAction());
+        actionRegistry.put("DRAW",         value -> new DrawCardAction(value));
     }
 
     public List<Effect> createEffects(String effectsRecipe) {

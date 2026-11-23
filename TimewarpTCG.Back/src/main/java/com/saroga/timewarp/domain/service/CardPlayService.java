@@ -48,6 +48,8 @@ public class CardPlayService {
                 gameState.switchPriority();
             }
         }
+        // unidades destruidas por el efecto recien jugado (ON_PLACED, hechizo INSTANT...) -> cementerio
+        gameState.cleanupDestroyed();
     }
 
     public void validatePlayCard(GameState gameState, PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {
@@ -137,7 +139,9 @@ public class CardPlayService {
         }
 
         if (card.isSpell()) {
-            if (speed == SpellSpeed.SLOW && !gameState.isStackEmpty() && (phase != GamePhase.MAIN_OPEN)) {
+            // SLOW solo en MAIN_OPEN. (Antes solo se comprobaba con la pila NO vacia: en COMBAT_OPEN con la pila vacia
+            // pasaba la validacion y el error saltaba despues de gastar el recurso y sacar la carta de la mano.)
+            if (speed == SpellSpeed.SLOW && phase != GamePhase.MAIN_OPEN) {
                 throw new IllegalStateException("Los hechizos SLOW solo se juegan en tu fase principal abierta.");
             }
             if (phase == GamePhase.MAIN_CLOSED || phase == GamePhase.COMBAT_CLOSED) {
