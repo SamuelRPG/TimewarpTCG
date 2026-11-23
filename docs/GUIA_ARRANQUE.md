@@ -143,6 +143,8 @@ Con la base en memoria todo se pierde al cerrar el servidor. Para que se guarde 
 
 > **Cuentas antiguas.** Las filas que ya tengas en `users` se crearon cuando solo hacía falta el nombre y no tienen contraseña, así que **nadie puede entrar con ellas** (es lo seguro por defecto: si no, cualquiera podría apropiarse de la cuenta). Crea una cuenta nueva. Si necesitas conservar los mazos de una cuenta antigua, arranca **una sola vez** con `set TIMEWARP_SECURITY_ALLOW_CLAIM_LEGACY_ACCOUNTS=true` en `supabase.env.cmd`, entra tú con ese nombre y una contraseña (la primera que se use queda como definitiva), y quita la línea.
 
+> **¿Qué significa `ON_PLACED:HUNTER_MARK:1:5`, `1:ENEMY`, `JUMPER`…?** Está todo explicado, con ejemplos de tus cartas, en [`docs/03_EFECTOS_KEYWORDS_Y_BASE_DE_DATOS.md`](03_EFECTOS_KEYWORDS_Y_BASE_DE_DATOS.md), y las 36 cartas una a una en [`docs/catalogo/CARTAS_EXPLICADAS.md`](catalogo/CARTAS_EXPLICADAS.md). Al arrancar, el backend revisa el catálogo y avisa de typos (`[CATALOGO] …` en la consola).
+
 ### Cómo añadir cartas nuevas
 1. Edita `docs/catalogo/cartas.csv` (Excel vale: separador `;`, UTF-8). Las columnas y valores permitidos están explicados en la cabecera de `tools/catalog/generar_sql.py`.
 2. Ejecuta `python tools/catalog/generar_sql.py` (valida el CSV y regenera `data.sql` y `docs/supabase/cartas.sql`).

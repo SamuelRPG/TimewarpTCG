@@ -83,25 +83,24 @@ Por cada carril disputado (izquierdo, luego derecho):
 
 La pila se resuelve **de arriba abajo** (el último lanzado, primero) cuando los dos pasáis seguidos. Los objetivos se validan por grupo: `ALLY`, `ENEMY`, `ANY_UNIT` y el número exacto que pide la carta.
 
-## 4. Cartas, keywords y efectos: qué está realmente conectado
+## 4. Cartas, keywords y efectos
 
-Una carta de BBDD (`data.sql`) lleva sus efectos como **texto**: `ON_PLACED:ALLY_BOOST:2` (`DISPARADOR:ACCIÓN:valor`, varios separados por `;`) y sus objetivos como `1:ALLY`.
+Esto tiene su propia guía: **[`docs/03_EFECTOS_KEYWORDS_Y_BASE_DE_DATOS.md`](03_EFECTOS_KEYWORDS_Y_BASE_DE_DATOS.md)** (qué significa cada disparador, acción, objetivo y keyword, cómo se leen las cadenas de `card_templates` y cómo llegan de Supabase a la partida) y el catálogo de 36 cartas explicado una a una en [`catalogo/CARTAS_EXPLICADAS.md`](catalogo/CARTAS_EXPLICADAS.md).
+
+Resumen del estado actual:
 
 | Pieza | Estado |
 |---|---|
-| Disparadores `ON_PLACED`, `ON_DESTROYED`, `ON_DAMAGE_TAKEN`, `ON_COMBAT_WIN`, `ON_MOVEMENT_CONFIRMED` | ✅ implementados en `TriggeredEffect` |
-| Acciones `ENEMY_DAMAGE`, `ALLY_BOOST`, `SELF_BUFF`, `CHARGE_BUFF`, `READY_SELF`, `HUNTER_MARK:daño:recompensa` | ✅ registradas en `EffectFactory` |
-| Keywords `JUMPER`, `DISRUPTION` | ✅ tienen lógica |
-| Keywords `GLORY`, `CHARGE` | ❌ existen en el enum pero **ningún código las lee** (su intención se logra con las acciones `READY_SELF` / `CHARGE_BUFF` en la receta de efectos) |
-| Acción de robar carta (`DrawCardAction`) | ❌ clase vacía y sin registrar en `EffectFactory` |
-| Grupos de objetivo `GLOBAL`, `LANE` | ❌ el validador los rechaza siempre |
-| Eventos `onCombat`, `beforeCombat`, `onOtherUnitPlaced`, `modifyDrive` | ❌ definidos en `Effect` pero `TriggeredEffect` no los implementa |
-
-Catálogo actual (`data.sql`, 6 cartas): Infantería Rápida (1/2), Dron Explorador (JUMPER), Centurión de Vanguardia (da +2 Drive a un aliado al entrar), Ciborg Mutante (+2 Drive si sobrevive a un daño), Virus Táctico (hechizo FAST, 3 de daño a un enemigo), Cazador de Recompensas (1 de daño al entrar; si el objetivo muere, +5).
+| Disparadores `ON_PLACED`, `ON_DESTROYED`, `ON_DAMAGE_TAKEN`, `ON_COMBAT_WIN`, `ON_MOVEMENT_CONFIRMED` | ✅ funcionan |
+| Acciones `ENEMY_DAMAGE`, `ALLY_BOOST`, `SELF_BUFF`, `CHARGE_BUFF`, `READY_SELF`, `DRAW`, `HUNTER_MARK:daño:recompensa` | ✅ funcionan |
+| Keywords `JUMPER`, `DISRUPTION` | ✅ funcionan |
+| Keywords `GLORY`, `CHARGE` | ❌ el motor no las lee (se logra con `READY_SELF` / `CHARGE_BUFF`) |
+| Grupos de objetivo `GLOBAL`, `LANE` | ❌ rechazados siempre |
+| Eventos `onCombat`, `beforeCombat`, `onOtherUnitPlaced`, `modifyDrive` | ❌ declarados, nadie los dispara |
 
 **Mazos de prueba** (`DeckFactory`, sin efectos):
 * **AGGRO**: 25× Infantería Rápida (coste 1, Drive 2) + 15× Vanguardia Pesada (coste 3, Drive 5).
-* **CONTROL**: 20× Muro de Energía (coste 1, Drive **4**) + 20× Chispa Temporal (hechizo FAST de coste 1, **sin efecto**). **Es el mazo del bot siempre.**
+* **CONTROL**: 20× Muro de Energía (coste 1, Drive **4**) + 20× Chispa Temporal (hechizo FAST de coste 1, **sin efecto**).
 
 ## 5. El bot (`BotBrainService`)
 

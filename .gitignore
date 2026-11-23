@@ -49,3 +49,7 @@ data/
 supabase.env.cmd
 application-local.properties
 application-*-local.properties
+
+# Python
+__pycache__/
+*.pyc

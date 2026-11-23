@@ -38,7 +38,7 @@ Ordenado por urgencia.
 
 ### 🔴 Hoy
 
-1. **Cambia la contraseña de la base de datos de Supabase.** Estuvo en `application.properties` y quedó en el historial de git de `develop` desde el commit `456d63c`; borrar el fichero no la elimina del historial. *Supabase ▸ Project Settings ▸ Database ▸ Reset database password*. Hazlo aunque el repo sea privado. Esta rama **no** contiene ninguna contraseña, pero tu `develop` sí.
+1. **Cambia la contraseña de la base de datos de Supabase. Tu repositorio es PÚBLICO**, así que la contraseña (con el usuario y el host) está **legible por cualquiera** en `application.properties` de `develop` y en su historial desde el commit `456d63c`; GitGuardian ya te ha avisado, y hay bots que rastrean GitHub en busca de esto. Borrar el fichero no la elimina del historial. *Supabase ▸ Project Settings ▸ Database ▸ Reset database password*. Después, revisa en Supabase que no haya nada raro (*Logs*, tablas y roles que no reconozcas) y, si usabas esa misma contraseña en otro sitio, cámbiala también. Esta rama **no** contiene ninguna contraseña, pero `develop` sí **hasta que la sustituyas** (fusionando esta rama o con un commit que quite el fichero).
 2. **Guarda la nueva contraseña solo en `supabase.env.cmd`** (ya está en `.gitignore`; no lo subas) o en variables de entorno.
 3. **Cuidado al traerte esta rama:** sustituye tu `application.properties` local por uno sin contraseña. **Haz copia de tu contraseña antes** (solo para pasarla a `supabase.env.cmd`; recuerda que debes cambiarla igualmente).
 4. **Ejecuta en Supabase** (SQL Editor), en este orden, una vez: `docs/supabase/seguridad_rls.sql` y después `docs/supabase/rol_app.sql` (cambia antes la contraseña que lleva el script). Sigue las indicaciones del final de `rol_app.sql` para usar ese rol desde el backend.
@@ -46,7 +46,7 @@ Ordenado por urgencia.
 ### 🟠 Esta semana
 
 5. **GitHub ▸ Settings ▸ Code security:** activa *Secret scanning* y *Push protection*. Añade *Branch protection* a `main` y `develop` y la **verificación en dos pasos** en tu cuenta.
-6. **Quita del repo lo que no debe estar:** `.idea/` y `data/*.mv.db` están subidos a `develop` (`git rm -r --cached .idea data`); el `.gitignore` de esta rama ya los excluye.
+6. **`.idea/` y `data/*.mv.db`** (la base H2 local) están subidos a `develop`. Esta rama ya los ha sacado del repositorio (y el `.gitignore` los excluye); basta con fusionarla. No contienen secretos (se comprobó), pero no deben estar.
 7. **Historial:** si el repositorio es o fue público, da la contraseña antigua por comprometida (ya la habrás cambiado en el paso 1). Borrarla del historial es posible (`git filter-repo` o BFG) pero reescribe todos los commits; hazlo solo si entiendes las consecuencias, y siempre *después* de cambiarla.
 8. **Borra la rama obsoleta** `feature/unity-client-y-fix-bot` en GitHub (fue un primer intento; la buena es `feature/unity-sobre-develop`).
 
