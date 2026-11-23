@@ -21,6 +21,7 @@ namespace TimewarpTCG
             public Zone zone;
             public bool mine;
             public Image bg;
+            public Text title;
             public RectTransform content;
             public Color baseColor;
         }
@@ -34,8 +35,19 @@ namespace TimewarpTCG
         Text _hudTurn, _hudPhase, _hudHelp, _hudScore, _hudGoal;
         Image _phaseBadge;
         ZoneUi _oppBase, _oppLeft, _oppRight, _myBase, _myLeft, _myRight;
-        Text _oppInfo, _myInfo, _laneLeftHdr, _laneRightHdr, _handTitle;
-        Deco.GemBar _oppRes, _myRes, _oppPts, _myPts;     // gemas de recurso y puntos de cada jugador
+        Text _laneLeftHdr, _laneRightHdr, _handTitle;
+        PlayerPanel _oppPanel, _myPanel;                   // recursos, puntos y prioridad de cada jugador
+        Image _turnPillBg; Text _turnPill;                 // "TU PRIORIDAD" / "JUEGA EL BOT…" en la barra superior
+        bool? _lastHadPriority;
+        string _oppName = "Bot";
+
+        /// <summary>Tarjeta de un jugador: nombre, prioridad, recurso (n / máx. del turno), puntos y contadores.</summary>
+        sealed class PlayerPanel
+        {
+            public Image frame, pillBg;
+            public Text name, pill, resText, ptsText, counts;
+            public Deco.GemBar res, pts;
+        }
         RectTransform _hand;
         Text _inspector, _stackText, _log;
         ScrollRect _logScroll;
@@ -161,7 +173,14 @@ namespace TimewarpTCG
 
             _hudHelp = UiKit.Label(hud.transform, "", 15, UiKit.Muted, TextAnchor.MiddleLeft);
             _hudHelp.rectTransform.anchorMin = new Vector2(0, 0); _hudHelp.rectTransform.anchorMax = new Vector2(1, 1);
-            _hudHelp.rectTransform.offsetMin = new Vector2(570, 2); _hudHelp.rectTransform.offsetMax = new Vector2(-420, -2);
+            _hudHelp.rectTransform.offsetMin = new Vector2(900, 2); _hudHelp.rectTransform.offsetMax = new Vector2(-420, -2);
+
+            // quién tiene la prioridad, bien grande: es lo que más se pierde de vista
+            _turnPillBg = UiKit.Box(hud.transform, "TurnPill", UiKit.Green, true, false);
+            UiKit.Place(_turnPillBg.rectTransform, 0, 0.5f, 560, 0, 330, 40);
+            _turnPill = UiKit.Label(_turnPillBg.transform, "", 20, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(_turnPill.rectTransform);
+            Deco.TextShadow(_turnPill, 0.5f, 1.4f);
 
             _hudScore = UiKit.Label(hud.transform, "", 34, UiKit.TextCol, TextAnchor.MiddleRight, FontStyle.Bold);
             UiKit.Place(_hudScore.rectTransform, 1, 0.5f, -16, 8, 400, 40);
@@ -197,6 +216,18 @@ namespace TimewarpTCG
             UiKit.Place(exit.GetComponent<RectTransform>(), 0.5f, 1, 0, -66, 330, 52);
         }
 
+        /// <summary>Motivo corto (para escribir sobre la carta) a partir de la pista larga de GameRules.PlayHint.</summary>
+        static string HintShort(string hint)
+        {
+            if (hint == null) return null;
+            if (hint.StartsWith("No tienes la prioridad")) return "ESPERA";
+            if (hint.StartsWith("Recurso insuficiente")) return "SIN RECURSO";
+            if (hint.StartsWith("Has movido")) return "CONFIRMA MOV.";
+            if (hint.Contains("base está llena")) return "BASE LLENA";
+            if (hint.Contains("terminado")) return "FIN";
+            return "AHORA NO";                                  // fase incorrecta (unidades o hechizos SLOW fuera de la fase principal)
+        }
+
         ZoneUi MakeZone(Transform region, string title, bool mine, Zone zone, bool titleVisible = true)
         {
             var z = new ZoneUi { zone = zone, mine = mine };
@@ -208,6 +239,7 @@ namespace TimewarpTCG
             {
                 var t = UiKit.Label(z.bg.transform, title, 13, UiKit.Muted, TextAnchor.UpperLeft, FontStyle.Bold);
                 UiKit.Place(t.rectTransform, 0, 1, 8, -3, 420, 18);
+                z.title = t;
             }
             z.content = UiKit.NewRect("Cards", z.bg.transform);
             UiKit.Stretch(z.content, 4, 20, 4, 4);
@@ -217,31 +249,78 @@ namespace TimewarpTCG
             return z;
         }
 
-        Text InfoBox(Transform region)
+        /// <summary>
+        /// Tarjeta de jugador. De arriba abajo: nombre y prioridad; RECURSO (disponible / máximo de este turno) y PUNTOS (de la meta de 10);
+        /// una fila de gemas (azul brillante = disponible, translúcido = ya gastado este turno, apagado = aún no desbloqueado)
+        /// y una fila de marcas doradas para los puntos; y los contadores de mazo, mano y cementerio.
+        /// </summary>
+        PlayerPanel BuildPlayerPanel(Transform region)
         {
-            var b = UiKit.Box(region, "Info", UiKit.Panel);
-            UiKit.Stretch(b.rectTransform);
-            var t = UiKit.Label(b.transform, "", 16, UiKit.TextCol, TextAnchor.UpperLeft);   // arriba: abajo van las barras de gemas
-            UiKit.Stretch(t.rectTransform, 10, 6, 6, 4);
-            return t;
+            var p = new PlayerPanel();
+            p.frame = UiKit.Box(region, "Info", UiKit.Panel);
+            UiKit.Stretch(p.frame.rectTransform);
+            Transform box = p.frame.transform;
+
+            p.name = UiKit.Label(box, "", 22, UiKit.TextCol, TextAnchor.UpperLeft, FontStyle.Bold);
+            UiKit.Place(p.name.rectTransform, 0, 1, 12, -7, 150, 30);
+            p.pillBg = UiKit.Box(box, "Pill", new Color32(30, 38, 62, 255), true, false);
+            UiKit.Place(p.pillBg.rectTransform, 1, 1, -10, -10, 118, 24);
+            p.pill = UiKit.Label(p.pillBg.transform, "", 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(p.pill.rectTransform);
+
+            var l1 = UiKit.Label(box, "RECURSO", 11, UiKit.Muted, TextAnchor.LowerLeft, FontStyle.Bold);
+            UiKit.Place(l1.rectTransform, 0, 1, 14, -38, 110, 16);
+            var l2 = UiKit.Label(box, "PUNTOS", 11, UiKit.Muted, TextAnchor.LowerLeft, FontStyle.Bold);
+            UiKit.Place(l2.rectTransform, 0, 1, 150, -38, 110, 16);
+            p.resText = UiKit.Label(box, "", 20, UiKit.TextCol, TextAnchor.MiddleLeft);
+            UiKit.Place(p.resText.rectTransform, 0, 1, 12, -52, 132, 46);
+            p.ptsText = UiKit.Label(box, "", 20, UiKit.TextCol, TextAnchor.MiddleLeft);
+            UiKit.Place(p.ptsText.rectTransform, 0, 1, 148, -52, 120, 46);
+
+            Color off = new Color32(30, 38, 62, 255);
+            p.res = Deco.GemBar.Create(box, 10, 14, 3, new Color32(80, 150, 245, 255), off, true);
+            UiKit.Place(p.res.Root, 0, 1, 13, -104, p.res.Width, 14);
+            p.pts = Deco.GemBar.Create(box, 10, 22, 3, UiKit.Gold, off, false);
+            UiKit.Place(p.pts.Root, 0, 1, 13, -124, p.pts.Width, 10);
+
+            p.counts = UiKit.Label(box, "", 13, UiKit.Muted, TextAnchor.UpperLeft);
+            UiKit.Place(p.counts.rectTransform, 0, 1, 12, -142, 256, 26);
+            return p;
         }
 
-        /// <summary>Dos filas de gemas bajo el texto del jugador: recurso disponible (azul, 10 como máximo) y puntos (dorado, la meta es 10).</summary>
-        void AddBars(Text info, out Deco.GemBar res, out Deco.GemBar pts)
+        void UpdatePanel(PlayerPanel p, PlayerDto d, string label, Color accent, int turn)
         {
-            Transform box = info.transform.parent;
-            Color off = new Color32(30, 38, 62, 255);
-            res = Deco.GemBar.Create(box, 10, 16, 4, new Color32(80, 150, 245, 255), off, true);
-            UiKit.Place(res.Root, 0, 0, 12, 34, res.Width, 16);
-            pts = Deco.GemBar.Create(box, 10, 20, 3, UiKit.Gold, off, false);
-            UiKit.Place(pts.Root, 0, 0, 12, 10, pts.Width, 14);
+            if (p == null || d == null) return;
+            int max = Mathf.Min(10, Mathf.Max(turn, d.resource));      // cada turno el recurso máximo es min(turno, 10) y se renueva entero
+            p.name.text = label; p.name.color = accent;
+            p.resText.text = "<size=40><b><color=#7FB2FF>" + d.resource + "</color></b></size><size=20><color=#9AA2B8>  / " + max + "</color></size>";
+            p.ptsText.text = "<size=40><b><color=#FFC43D>" + d.score + "</color></b></size><size=20><color=#9AA2B8>  / 10</color></size>";
+            p.res.Set(d.resource, max);
+            p.pts.Set(d.score);
+            p.counts.text = "Mazo " + d.deckSize + "  ·  Mano " + d.handSize + "  ·  Cementerio " + d.graveyardSize;
+            p.pillBg.color = d.hasPriority ? (Color)new Color32(46, 150, 92, 255) : (Color)new Color32(30, 38, 62, 255);
+            p.pill.text = d.hasPriority ? "● PRIORIDAD" : "○ ESPERA";
+            p.pill.color = d.hasPriority ? Color.white : UiKit.Muted;
+            // marco de luz del color del jugador mientras tiene la prioridad
+            Deco.Safe(() => UiKit.AddOutline(p.frame, d.hasPriority ? new Color(accent.r, accent.g, accent.b, 0.85f) : new Color(1f, 1f, 1f, 0.07f), d.hasPriority ? 2f : 1f), "marco de prioridad");
+        }
+
+        /// <summary>Nombre del rival: "Bot" contra la máquina o el nombre de la persona contra la que juegas online.</summary>
+        public void SetOpponent(string name)
+        {
+            _oppName = string.IsNullOrWhiteSpace(name) ? "Bot" : name.Trim();
+            StateDiff.OpponentName = _oppName;
+            string up = _oppName.ToUpperInvariant();
+            bool bot = _oppName == "Bot";
+            if (_oppBase != null && _oppBase.title != null) _oppBase.title.text = bot ? "BASE DEL BOT" : "BASE DE " + up;
+            if (_oppLeft != null && _oppLeft.title != null) _oppLeft.title.text = up + " · carril izquierdo";
+            if (_oppRight != null && _oppRight.title != null) _oppRight.title.text = up + " · carril derecho";
         }
 
         void BuildBoard()
         {
             // fila del rival
-            _oppInfo = InfoBox(UiKit.Region(Root, "OppInfoR", 0.185f, 0.07f, 0.33f, 0.235f));
-            AddBars(_oppInfo, out _oppRes, out _oppPts);
+            _oppPanel = BuildPlayerPanel(UiKit.Region(Root, "OppInfoR", 0.185f, 0.07f, 0.33f, 0.235f));
             _oppBase = MakeZone(UiKit.Region(Root, "OppBaseR", 0.33f, 0.07f, 1f, 0.235f), "BASE DEL BOT", false, Zone.Base);
 
             // carriles: cabecera + zona rival + zona propia
@@ -254,8 +333,7 @@ namespace TimewarpTCG
             _myRight = MakeZone(UiKit.Region(Root, "MyRightR", 0.5925f, 0.43f, 1f, 0.595f), "TÚ · carril derecho", true, Zone.Right);
 
             // fila propia
-            _myInfo = InfoBox(UiKit.Region(Root, "MyInfoR", 0.185f, 0.595f, 0.33f, 0.76f));
-            AddBars(_myInfo, out _myRes, out _myPts);
+            _myPanel = BuildPlayerPanel(UiKit.Region(Root, "MyInfoR", 0.185f, 0.595f, 0.33f, 0.76f));
             _myBase = MakeZone(UiKit.Region(Root, "MyBaseR", 0.33f, 0.595f, 1f, 0.76f), "TU BASE", true, Zone.Base);
         }
 
@@ -345,7 +423,8 @@ namespace TimewarpTCG
             _localPending.Clear();
             _busy = false;
             _handCards.Clear(); _rects.Clear(); _prevScreen.Clear(); _prevHandIds.Clear();
-            _hoverIdx = -1; _dragging = false;
+            _hoverIdx = -1;
+            AbortDrag();
             ClearSelection();
             _gameOver.gameObject.SetActive(false);
             _disc.gameObject.SetActive(false);
@@ -356,6 +435,9 @@ namespace TimewarpTCG
 
         public void Tick()
         {
+            // red de seguridad: un arrastre cuya carta de origen ya no existe nunca recibira OnEndDrag; un fantasma sin arrastre sobra
+            if (_dragging && _dragSourceRt == null) AbortDrag();
+            else if (!_dragging && _ghost != null) EndDragVisuals();
             if (_toast.gameObject.activeSelf && Time.unscaledTime > _toastUntil) _toast.gameObject.SetActive(false);
             if (_busy && Time.unscaledTime - _busySince > 10f)
             {
@@ -564,6 +646,7 @@ namespace TimewarpTCG
 
         void RenderInner()
         {
+            if (_dragging || _ghost != null) AbortDrag();      // la carta que se arrastraba va a ser reconstruida: no dejar el fantasma
             var s = _state; var me = s.activePlayer; var op = s.opponent;
             var pending = Pending();
             bool over = GameRules.IsOver(s);
@@ -575,12 +658,17 @@ namespace TimewarpTCG
             _hudPhase.text = GameRules.PhaseName(s.gamePhase);
             _phaseBadge.color = PhaseColor(s.gamePhase);
             _hudHelp.text = GameRules.PhaseHelp(s.gamePhase);
-            _hudScore.text = "<color=#7FB2FF>TÚ " + me.score + "</color>  —  <color=#FF8A80>" + op.score + " BOT</color>";
+            _hudScore.text = "<color=#7FB2FF>TÚ " + me.score + "</color>  —  <color=#FF8A80>" + op.score + " " + _oppName.ToUpperInvariant() + "</color>";
+
+            // --- quién tiene la prioridad
+            _turnPillBg.color = over ? UiKit.PanelLight : (me.hasPriority ? (Color)new Color32(46, 150, 92, 255) : (Color)new Color32(200, 96, 56, 255));
+            _turnPill.text = over ? "FIN DE LA PARTIDA" : (me.hasPriority ? "TU PRIORIDAD · ACTÚA" : "JUEGA " + _oppName.ToUpperInvariant() + "…");
+            if (_lastHadPriority.HasValue && _lastHadPriority.Value != me.hasPriority && !over) Fx.Pulse(_turnPillBg.rectTransform, 1.16f);
+            _lastHadPriority = me.hasPriority;
 
             // --- info jugadores
-            _oppInfo.text = Info(op, "BOT", UiKit.Red);
-            _myInfo.text = Info(me, "TÚ", UiKit.Blue);
-            if (_myRes != null) { _myRes.Set(me.resource); _myPts.Set(me.score); _oppRes.Set(op.resource); _oppPts.Set(op.score); }
+            UpdatePanel(_oppPanel, op, _oppName.ToUpperInvariant(), UiKit.Red, s.turn);
+            UpdatePanel(_myPanel, me, "TÚ", UiKit.Blue, s.turn);
 
             // --- carriles
             _laneLeftHdr.text = LaneTitle("CARRIL IZQUIERDO", GameRules.Contested(s, Zone.Left));
@@ -610,7 +698,8 @@ namespace TimewarpTCG
                 bool won = GameRules.IWon(s);
                 _goTitle.text = won ? "¡VICTORIA!" : "DERROTA";
                 _goTitle.color = won ? UiKit.Green : UiKit.Red;
-                _goSub.text = "Puntuación final:  TÚ " + me.score + "  —  " + op.score + "  BOT\nTurno " + s.turn;
+                _goSub.text = "Puntuación final:  TÚ " + me.score + "  —  " + op.score + "  " + _oppName.ToUpperInvariant() + "\nTurno " + s.turn
+                            + (Mathf.Max(me.score, op.score) < 10 ? "\n<color=#FFC43D>" + (won ? _oppName + " ha abandonado la partida." : "La partida terminó por abandono.") + "</color>" : "");
                 _gameOver.gameObject.SetActive(true);
                 _gameOver.SetAsLastSibling();
             }
@@ -650,6 +739,15 @@ namespace TimewarpTCG
                 var st = new CardStyle();
                 st.selected = _selCard != null && !_selFromHand && _selCard.id == c.id;
                 st.pending = z.mine && pending.Contains(c.id);
+                if (z.mine && !st.pending && !GameRules.IsOver(_state) && GameRules.IsUnit(c) && _mode != Mode.PickTargets)
+                {
+                    // unidad tuya que se puede mover ahora mismo (lista, con prioridad): borde verde y etiqueta
+                    if (!c.isExhausted && GameRules.MoveHint(_state, c) == null)
+                    {
+                        st.hasOutline = true; st.outline = UiKit.Green;
+                        st.badge = "MOVER"; st.badgeColor = UiKit.Green;
+                    }
+                }
                 if (_mode == Mode.PickTargets)
                 {
                     if (_picked.Contains(c.id)) { st.selected = true; st.badge = "OBJ"; }
@@ -692,7 +790,7 @@ namespace TimewarpTCG
             UiKit.ClearChildren(_hand);
             _handCards.Clear();
             var hand = me.hand ?? new List<CardDto>();
-            _handTitle.text = "TU MANO (" + hand.Count + ")";
+            _handTitle.text = "TU MANO (" + hand.Count + ")   ·   <color=#46B973>borde verde = se puede jugar ahora</color>   ·   cartas grises = no (el motivo está sobre la carta)";
             float W = _hand.rect.width > 100 ? _hand.rect.width : 1180f;
             bool first = _prevHandIds.Count == 0;
             var ids = new HashSet<string>();
@@ -703,7 +801,19 @@ namespace TimewarpTCG
                 int idx = i;
                 var st = new CardStyle();
                 st.selected = _selCard != null && _selFromHand && _selCard.id == card.id;
-                st.dim = GameRules.PlayHint(_state, card, pending) != null;
+                string playHint = GameRules.PlayHint(_state, card, pending);
+                st.dim = playHint != null;
+                if (playHint == null)
+                {
+                    // se puede jugar AHORA: borde verde y etiqueta
+                    st.hasOutline = true; st.outline = UiKit.Green;
+                    st.badge = "JUGAR"; st.badgeColor = UiKit.Green;
+                }
+                else
+                {
+                    st.reason = HintShort(playHint);
+                    st.costRed = card.currentCost > me.resource;      // el coste se pone rojo si no te llega el recurso
+                }
                 var view = CardView.Create(_hand, card, HandW, HandH, st,
                     () => OnHandClicked(card),
                     () => { if (_dragging) return; _hoverIdx = idx; Inspect(card); LayoutHand(false); },
@@ -771,7 +881,7 @@ namespace TimewarpTCG
             {
                 var e = s.spellStack[i];
                 bool mine = e.ownerId == s.activePlayer.id;
-                sb.Append(mine ? "<color=#7FB2FF>Tú</color>" : "<color=#FF8A80>Bot</color>").Append(": <b>").Append(e.cardName).Append("</b> (").Append(e.spellSpeed).Append(")\n");
+                sb.Append(mine ? "<color=#7FB2FF>Tú</color>" : "<color=#FF8A80>" + _oppName + "</color>").Append(": <b>").Append(e.cardName).Append("</b> (").Append(e.spellSpeed).Append(")\n");
             }
             _stackText.text = sb.ToString();
         }
@@ -816,7 +926,8 @@ namespace TimewarpTCG
                     UiKit.ButtonLabel(_primaryBtn).text = GameRules.IsSpell(_selCard) ? "LANZAR" : "JUGAR";
                     _ctxText.text = total == 0
                         ? "<b>" + _selCard.name + "</b> no necesita objetivos."
-                        : "<b>" + _selCard.name + "</b>: elige objetivos (<b>" + _picked.Count + "/" + total + "</b>) — " + GameRules.RequirementsText(_selCard) + ".";
+                        : "<b>" + _selCard.name + "</b>: elige objetivos (<b>" + _picked.Count + "/" + total + "</b>) — " + GameRules.RequirementsText(_selCard) + "."
+                          + (GameRules.IsUnit(_selCard) ? " <color=#9AA2B8>Si no hay objetivos, puedes jugarla igualmente.</color>" : "");
                     break;
             }
             _primaryBtn.gameObject.SetActive(showPrimary);
@@ -833,6 +944,7 @@ namespace TimewarpTCG
         void BeginDrag(CardDto c, bool fromHand, Zone zone, RectTransform source, PointerEventData e)
         {
             if (_state == null || GameRules.IsOver(_state) || _busy) return;
+            if (_ghost != null) EndDragVisuals();               // un fantasma antiguo que nadie limpio: se borra antes de crear el nuevo
             _dragging = true; _dragCard = c; _dragFromHand = fromHand; _dragZone = zone;
             _dragSourceRt = source; _hoverIdx = -1;
 
@@ -908,6 +1020,16 @@ namespace TimewarpTCG
         }
 
         void CancelDrag() { ClearSelection(); Render(); }
+
+        /// <summary>
+        /// Cancela un arrastre y borra el "fantasma" de la carta. Hace falta porque Unity NO llama a OnEndDrag si la carta de origen se
+        /// destruye durante el arrastre (p. ej. llega un estado nuevo y se repinta el tablero): sin esto, el fantasma se quedaba flotando.
+        /// </summary>
+        void AbortDrag()
+        {
+            _dragging = false;
+            EndDragVisuals();
+        }
 
         void EndDragVisuals()
         {

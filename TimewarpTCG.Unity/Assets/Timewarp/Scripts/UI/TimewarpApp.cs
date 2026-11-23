@@ -33,6 +33,8 @@ namespace TimewarpTCG
         HelpView _help;
         DeckBuilderView _builder;
         GameConnection _conn;
+        bool _online;                       // la partida en curso (o la búsqueda) es contra otra persona
+        string _opponentName;
         string _deckInUse, _botDeckInUse = "RANDOM";
         float _connectDeadline;
 
@@ -77,6 +79,8 @@ namespace TimewarpTCG
                 _menu.OnRegister = (name, pass) => { var _ = LoginAsync(name, pass, true); };
                 _menu.OnEditDecks = () => { var _ = EditDecksAsync(); };
                 _menu.OnPlay = OnPlayClicked;
+                _menu.OnOnline = OnOnlineClicked;
+                _menu.OnCancelSearch = CancelSearch;
                 _menu.OnHelp = () => _help.Show(true);
                 _game.OnHelp = () => _help.Show(true);
                 _game.OnExitToMenu = ShowMenu;
@@ -119,10 +123,38 @@ namespace TimewarpTCG
 
         static void EnsureEventSystem()
         {
-            if (EventSystem.current != null) return;
-            var go = new GameObject("EventSystem");
-            go.AddComponent<EventSystem>();
-            AddInputModule(go);
+            if (EventSystem.current == null)
+            {
+                var go = new GameObject("EventSystem");
+                go.AddComponent<EventSystem>();
+                AddInputModule(go);
+            }
+            MakeTextInputSafe();
+        }
+
+        /// <summary>
+        /// Con SOLO el Input System nuevo, el InputField clásico lanza una excepción al consultar la API de entrada antigua y
+        /// deja de aceptar texto (ver SafeBaseInput). Se corrige en el módulo que haya, sea el nuestro o uno que ya existiera en la escena.
+        /// </summary>
+        static void MakeTextInputSafe()
+        {
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+            try
+            {
+                var module = EventSystem.current != null ? EventSystem.current.GetComponent<BaseInputModule>() : null;
+                if (module == null) return;
+                var field = typeof(BaseInputModule).GetField("m_InputOverride", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (field == null) { Debug.LogWarning("[Timewarp] No se pudo preparar la entrada de texto (campo m_InputOverride no encontrado). " +
+                                                      "Si no puedes escribir en los campos, pon Edit > Project Settings > Player > Active Input Handling = Both."); return; }
+                if (field.GetValue(module) != null) return;
+                field.SetValue(module, module.gameObject.AddComponent<SafeBaseInput>());
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[Timewarp] No se pudo preparar la entrada de texto: " + e.Message +
+                                 ". Si no puedes escribir, pon Edit > Project Settings > Player > Active Input Handling = Both.");
+            }
+#endif
         }
 
         // Unity 6 crea los proyectos con el "Input System" nuevo; los anteriores con el clásico.
@@ -151,7 +183,8 @@ namespace TimewarpTCG
             if (_screen == AppScreen.Game) _game.Tick();
             if (_builder != null) _builder.Tick();
             if (_screen == AppScreen.Connecting && Time.unscaledTime > _connectDeadline)
-                FailConnect("El servidor no respondió a la petición de partida. ¿Está arrancado el backend?");
+                FailConnect(_online ? "No se ha encontrado rival a tiempo. Vuelve a intentarlo."
+                                    : "El servidor no respondió a la petición de partida. ¿Está arrancado el backend?");
         }
 
         void OnDestroy() { CloseConnection(); }
@@ -160,7 +193,10 @@ namespace TimewarpTCG
         // ------------------------------------------------------------ flujo
         void ShowMenu()
         {
-            CloseConnection();
+            CloseConnection();                  // si estabas en una partida online, el servidor la da por abandonada
+            _online = false; _opponentName = null;
+            _menu.ShowSearching(false);
+            _game.SetOpponent(null);
             _game.Show(false);
             _game.Reset();
             _menu.Show(true);
@@ -210,6 +246,7 @@ namespace TimewarpTCG
             catch (Exception e)
             {
                 Logout();
+                Debug.LogWarning("[Timewarp] " + (register ? "Crear cuenta" : "Iniciar sesión") + " falló en " + host + ": " + e.Message);
                 _menu.SetStatus((register ? "No se pudo crear la cuenta: " : "No se pudo iniciar sesión: ") + e.Message, true);
                 _menu.SetBusy(false);
                 return false;
@@ -291,8 +328,60 @@ namespace TimewarpTCG
             }
         }
 
+        async void OnOnlineClicked()
+        {
+            if (_screen != AppScreen.Menu) return;
+            _menu.Remember();
+            string host = _menu.Host;
+            string deck = _menu.SelectedDeck;
+            if (!_menu.IsBuiltinDeck && !HasSession(host))
+            {
+                _menu.SetStatus("Para jugar online con «" + deck + "» inicia sesión (nombre + contraseña y ENTRAR). Con AGGRO o CONTROL puedes entrar como invitado.", true);
+                return;
+            }
+
+            _menu.SetBusy(true);
+            _menu.SetStatus("Conectando con " + host + "…", false);
+            _screen = AppScreen.Connecting;
+            _online = true; _opponentName = null;
+            _connectDeadline = Time.unscaledTime + 30f;
+            try
+            {
+                string playerId, token;
+                if (HasSession(host)) { playerId = _userId; token = _token; }
+                else { var g = await RestApi.GuestAsync(host); playerId = g.id; token = g.token; }
+
+                CloseConnection();
+                _conn = new GameConnection();
+                _conn.StatusReceived += OnStatus;
+                _conn.StateReceived += OnState;
+                _conn.ErrorReceived += OnError;
+                _conn.Disconnected += OnDisconnected;
+                _conn.Log += m => Debug.Log("[Timewarp] " + m);
+                _game.Conn = _conn;
+
+                await _conn.ConnectAsync(host, playerId, token);
+                _deckInUse = deck;
+                _menu.SetStatus("", false);
+                _menu.ShowSearching(true, "BUSCANDO RIVAL…", "Conectado. Entrando en la cola…");
+                _connectDeadline = Time.unscaledTime + 330f;          // el servidor saca de la cola a los 5 minutos
+                _conn.JoinQueue(deck);
+            }
+            catch (Exception e)
+            {
+                FailConnect("No se pudo buscar partida online con " + host + ".\n" + e.Message);
+            }
+        }
+
         void Rematch()
         {
+            if (_online)
+            {
+                // contra una persona: otra búsqueda con el mismo mazo (el rival puede ser otro)
+                ShowMenu();
+                OnOnlineClicked();
+                return;
+            }
             if (_conn == null || !_conn.IsConnected) { ShowMenu(); return; }
             _game.Reset();
             _conn.StartLocalMatch(_deckInUse, _botDeckInUse);
@@ -301,6 +390,8 @@ namespace TimewarpTCG
         void FailConnect(string message)
         {
             CloseConnection();
+            _online = false; _opponentName = null;
+            _menu.ShowSearching(false);
             _menu.Show(true);
             _game.Show(false);
             _menu.SetBusy(false);
@@ -311,6 +402,7 @@ namespace TimewarpTCG
         void CloseConnection()
         {
             if (_conn == null) return;
+            _conn.StatusReceived -= OnStatus;
             _conn.StateReceived -= OnState;
             _conn.ErrorReceived -= OnError;
             _conn.Disconnected -= OnDisconnected;
@@ -324,17 +416,46 @@ namespace TimewarpTCG
         {
             if (_screen == AppScreen.Connecting)
             {
+                _menu.ShowSearching(false);
                 _menu.Show(false);
                 _game.Reset();
+                _game.SetOpponent(_online ? _opponentName : null);
                 _game.Show(true);
                 _screen = AppScreen.Game;
             }
             if (_screen == AppScreen.Game) _game.OnState(s);
         }
 
+        /// <summary>Avisos de la cola de partida online (QUEUED, MATCHED, LEFT, TIMEOUT).</summary>
+        void OnStatus(MatchStatusDto st)
+        {
+            if (st == null || !_online) return;
+            switch (st.type)
+            {
+                case "QUEUED":
+                    _menu.ShowSearching(true, "BUSCANDO RIVAL…", "Mazo: " + _deckInUse + "\nEn cuanto otra persona busque partida, empezáis.\nPuedes cancelar cuando quieras.");
+                    break;
+                case "MATCHED":
+                    _opponentName = string.IsNullOrEmpty(st.opponentName) ? "Rival" : st.opponentName;
+                    _menu.ShowSearching(true, "¡RIVAL ENCONTRADO!", "Vas a jugar contra  " + _opponentName + "\nPreparando la partida…");
+                    _connectDeadline = Time.unscaledTime + 15f;
+                    break;
+                case "TIMEOUT":
+                    FailConnect(string.IsNullOrEmpty(st.message) ? "No se ha encontrado rival. Vuelve a intentarlo." : st.message);
+                    break;
+            }
+        }
+
+        void CancelSearch()
+        {
+            if (_conn != null && _conn.IsConnected) _conn.LeaveQueue();
+            ShowMenu();
+            _menu.SetStatus("Búsqueda cancelada.", false);
+        }
+
         void OnError(string message)
         {
-            if (_screen == AppScreen.Connecting) FailConnect("El servidor rechazó la petición de partida: " + message);
+            if (_screen == AppScreen.Connecting) FailConnect((_online ? "No se pudo buscar partida: " : "El servidor rechazó la petición de partida: ") + message);
             else if (_screen == AppScreen.Game) _game.OnError(message);
         }
 

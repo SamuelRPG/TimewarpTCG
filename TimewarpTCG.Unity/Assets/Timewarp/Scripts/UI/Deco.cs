@@ -220,11 +220,11 @@ namespace TimewarpTCG
             public RectTransform Root;
             public float Width;
             Image[] _gems;
-            Color _on, _off;
+            Color _on, _off, _spent;
 
             public static GemBar Create(Transform parent, int count, float size, float gap, Color on, Color off, bool round)
             {
-                var bar = new GemBar { _on = on, _off = off, _gems = new Image[count] };
+                var bar = new GemBar { _on = on, _off = off, _spent = new Color(on.r, on.g, on.b, 0.28f), _gems = new Image[count] };
                 bar.Width = count * (size + gap) - gap;
                 bar.Root = UiKit.NewRect("GemBar", parent);
                 for (int i = 0; i < count; i++)
@@ -241,6 +241,13 @@ namespace TimewarpTCG
             {
                 for (int i = 0; i < _gems.Length; i++)
                     if (_gems[i] != null) _gems[i].color = i < filled ? _on : _off;
+            }
+
+            /// <summary>filled = disponibles ahora (brillantes); max = total de este turno: los que ya gastaste quedan translúcidos y el resto, apagados.</summary>
+            public void Set(int filled, int max)
+            {
+                for (int i = 0; i < _gems.Length; i++)
+                    if (_gems[i] != null) _gems[i].color = i < filled ? _on : (i < max ? _spent : _off);
             }
         }
     }

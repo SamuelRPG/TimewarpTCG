@@ -85,6 +85,11 @@ namespace TimewarpTCG
     // ---------- Peticiones (cliente -> servidor) ----------
     [Serializable] public class StartMatchRequest { public string playerId; public string deckName; public string botDeck; }
     [Serializable] public class PassPriorityRequest { public string gameId; public string playerId; }
+    [Serializable] public class JoinQueueRequest { public string playerId; public string deckName; }
+    [Serializable] public class ConcedeRequest { public string gameId; public string playerId; }
+
+    /// <summary>Avisos del emparejamiento (/topic/player/{id}/status). type: QUEUED, MATCHED, LEFT o TIMEOUT.</summary>
+    [Serializable] public class MatchStatusDto { public string type; public string opponentName; public string message; }
     [Serializable] public class MoveCardRequest { public string gameId; public string playerId; public string cardId; public string destination; }
     [Serializable]
     public class PlayCardRequest

@@ -8,7 +8,9 @@ namespace TimewarpTCG
     public static class StateDiff
     {
         const string Me = "<color=#7FB2FF><b>Tú</b></color>";
-        const string Bot = "<color=#FF8A80><b>Bot</b></color>";
+        /// <summary>Nombre del rival en el registro de la partida: "Bot" contra la maquina o el nombre de la persona online.</summary>
+        public static string OpponentName = "Bot";
+        static string Bot { get { return "<color=#FF8A80><b>" + OpponentName + "</b></color>"; } }
 
         struct Seen
         {
@@ -156,7 +158,7 @@ namespace TimewarpTCG
                 if (b.inHand) continue;
                 if (!after.ContainsKey(kv.Key))
                 {
-                    lines.Add("<color=#FFB74D>x</color> <b>" + b.card.name + "</b> de " + (b.mine ? "Tú" : "Bot") + " es destruida (" + b.card.currentDrive + " de Drive).");
+                    lines.Add("<color=#FFB74D>x</color> <b>" + b.card.name + "</b> de " + (b.mine ? "Tú" : OpponentName) + " es destruida (" + b.card.currentDrive + " de Drive).");
                     if (!b.mine) oppDestroyed++;
                 }
             }
@@ -170,7 +172,7 @@ namespace TimewarpTCG
                 if (before.TryGetValue(kv.Key, out b) && !b.inHand && b.card.currentDrive != a.card.currentDrive)
                 {
                     string col = a.card.currentDrive > b.card.currentDrive ? "#81C784" : "#FF8A80";
-                    lines.Add("   <b>" + a.card.name + "</b> (" + (a.mine ? "Tú" : "Bot") + "): Drive <color=" + col + ">" + b.card.currentDrive + " → " + a.card.currentDrive + "</color>");
+                    lines.Add("   <b>" + a.card.name + "</b> (" + (a.mine ? "Tú" : OpponentName) + "): Drive <color=" + col + ">" + b.card.currentDrive + " → " + a.card.currentDrive + "</color>");
                 }
             }
 
@@ -188,7 +190,7 @@ namespace TimewarpTCG
                 if (prev.spellStack != null) foreach (var e in prev.spellStack) prevIds.Add(e.cardId);
                 foreach (var e in next.spellStack)
                     if (!prevIds.Contains(e.cardId))
-                        lines.Add("   «" + e.cardName + "» entra en la pila (" + (e.ownerId == next.activePlayer.id ? "Tú" : "Bot") + ").");
+                        lines.Add("   «" + e.cardName + "» entra en la pila (" + (e.ownerId == next.activePlayer.id ? "Tú" : OpponentName) + ").");
             }
             if (pPrev > 0 && pNext == 0) lines.Add("   La pila se resuelve.");
 
@@ -209,7 +211,7 @@ namespace TimewarpTCG
             if (dMe != 0 || dBot != 0)
             {
                 lines.Add("<color=#FFD54F>* Puntos</color>: Tú " + next.activePlayer.score + (dMe > 0 ? " (+" + dMe + ")" : "")
-                          + " · Bot " + next.opponent.score + (dBot > 0 ? " (+" + dBot + ")" : ""));
+                          + " · " + OpponentName + " " + next.opponent.score + (dBot > 0 ? " (+" + dBot + ")" : ""));
             }
 
             if (GameRules.IsOver(next) && !GameRules.IsOver(prev))

@@ -36,6 +36,15 @@ Si tras confirmar movimientos ambos jugadores tienen unidades en el mismo carril
 <b><size=26>MAZOS</size></b>
 Desde el menú, «Editar mis mazos» (necesita tu nombre de cuenta): clic izquierdo añade una copia de una carta y clic derecho la quita. Un mazo válido tiene <b>exactamente 40 cartas, máximo 3 copias de cada una y máximo 2 facciones</b>. El bot juega por defecto con un mazo aleatorio distinto cada partida.
 
+<b><size=26>CÓMO LEER LA PANTALLA</size></b>
+<color=#46B973>Borde verde + etiqueta JUGAR</color> en una carta de la mano: se puede jugar ahora. Una carta <b>gris</b> no se puede, y el motivo está escrito encima (SIN RECURSO, ESPERA, AHORA NO...); si no te llega el recurso, su coste sale en rojo.
+<color=#46B973>Borde verde + etiqueta MOVER</color> en una unidad tuya: está lista y puedes moverla. Si pone AGOTADA, ya se movió y no puede hasta tu próximo turno. MOV = movimiento pendiente de confirmar.
+<b>Recurso</b>: tu tarjeta (izquierda del tablero) muestra el recurso disponible y el máximo de este turno (3 / 5); las gemas azules brillantes son las que te quedan, las translúcidas las que ya gastaste. Cada turno se renueva entero y sube 1 hasta un máximo de 10. Los <b>puntos</b> son las marcas doradas (meta: 10 y 2 de ventaja).
+<b>Prioridad</b>: la barra de arriba dice quién puede actuar: <color=#46B973>TU PRIORIDAD</color> o <color=#F0A060>JUEGA EL RIVAL</color>. El bot juega con pausas, una acción cada vez, para que puedas seguirlo.
+
+<b><size=26>PARTIDA ONLINE</size></b>
+«Buscar partida online» te empareja con otra persona que también esté buscando (con AGGRO, CONTROL o uno de tus mazos). Las reglas son las mismas. Si cierras la partida o te desconectas, la pierdes; si no actúas durante 3 minutos, también. El rival no ve tu mano.
+
 <b><size=26>EL PANEL IZQUIERDO</size></b>
 Arriba verás los detalles de la carta bajo el ratón; en medio, la pila de hechizos; abajo, el registro de la partida (qué ha hecho el bot en su turno).
 

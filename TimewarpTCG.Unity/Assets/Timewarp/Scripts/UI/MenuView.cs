@@ -10,7 +10,7 @@ namespace TimewarpTCG
     public sealed class MenuView
     {
         public RectTransform Root;
-        public Action OnPlay, OnHelp, OnEditDecks;
+        public Action OnPlay, OnHelp, OnEditDecks, OnOnline, OnCancelSearch;
         public Action<string, string> OnLogin;       // (nombre, contraseña)
         public Action<string, string> OnRegister;
 
@@ -24,6 +24,8 @@ namespace TimewarpTCG
         List<DeckDto> _decks = new List<DeckDto>();
 
         const string KHost = "tw_host", KUser = "tw_user", KDeck = "tw_deck", KBot = "tw_bot";
+
+        bool _showPass;
 
         public string Host { get { return string.IsNullOrWhiteSpace(_host.text) ? "localhost:8080" : _host.text.Trim(); } }
         public string Username { get { return _user.text == null ? "" : _user.text.Trim(); } }
@@ -63,7 +65,17 @@ namespace TimewarpTCG
             _pass = UiKit.MakeInput(panel.transform, "contraseña", "", 22);
             _pass.contentType = InputField.ContentType.Password;       // se muestra como ••••, y nunca se guarda en PlayerPrefs
             _pass.ForceLabelUpdate();
-            UiKit.Place(_pass.GetComponent<RectTransform>(), 0.5f, 1, 370, -162, 220, 48);
+            UiKit.Place(_pass.GetComponent<RectTransform>(), 0.5f, 1, 345, -162, 170, 48);
+            var peek = UiKit.MakeButton(panel.transform, "VER", UiKit.PanelLight, null, 14);
+            UiKit.Place(peek.GetComponent<RectTransform>(), 0.5f, 1, 455, -162, 48, 48);
+            peek.onClick.AddListener(() =>
+            {
+                // muestra u oculta lo escrito: sirve para comprobar que el campo recibe el teclado
+                _showPass = !_showPass;
+                _pass.contentType = _showPass ? InputField.ContentType.Standard : InputField.ContentType.Password;
+                _pass.ForceLabelUpdate();
+                UiKit.ButtonLabel(peek).text = _showPass ? "OCULT." : "VER";
+            });
 
             _session = UiKit.Label(panel.transform, "", 16, UiKit.Muted, TextAnchor.MiddleLeft);
             UiKit.Place(_session.rectTransform, 0.5f, 1, -230, -222, 500, 44);
@@ -101,8 +113,13 @@ namespace TimewarpTCG
             }
 
             _play = UiKit.MakeButton(panel.transform, "JUGAR CONTRA EL BOT", UiKit.Green, () => { if (OnPlay != null) OnPlay(); }, 32);
-            UiKit.Place(_play.GetComponent<RectTransform>(), 0.5f, 1, 0, -706, 940, 90);
+            UiKit.Place(_play.GetComponent<RectTransform>(), 0.5f, 1, -200, -706, 540, 90);
             Deco.Halo(_play.targetGraphic, new Color(0.27f, 0.73f, 0.45f, 0.35f), 5f);   // el botón principal destaca
+            UiKit.ButtonLabel(_play).fontSize = 28;
+
+            _onlineBtn = UiKit.MakeButton(panel.transform, "BUSCAR PARTIDA\nONLINE (vs. persona)", new Color32(120, 70, 190, 255), () => { if (OnOnline != null) OnOnline(); }, 20);
+            UiKit.Place(_onlineBtn.GetComponent<RectTransform>(), 0.5f, 1, 275, -706, 390, 90);
+            Deco.Halo(_onlineBtn.targetGraphic, new Color(0.62f, 0.4f, 0.95f, 0.35f), 4f);
 
             _status = UiKit.Label(panel.transform, "", 20, UiKit.TextCol, TextAnchor.UpperCenter);
             UiKit.Place(_status.rectTransform, 0.5f, 1, 0, -806, 940, 90);
@@ -110,10 +127,43 @@ namespace TimewarpTCG
             var help = UiKit.MakeButton(panel.transform, "¿Cómo se juega?", UiKit.PanelLight, () => { if (OnHelp != null) OnHelp(); }, 20);
             UiKit.Place(help.GetComponent<RectTransform>(), 0.5f, 0, 0, 20, 300, 50);
 
+            BuildSearchOverlay();
+
             _selectedDeck = PlayerPrefs.GetString(KDeck, "AGGRO");
             SetSession(null);
             SetDecks(new List<DeckDto>());
             RefreshBot();
+        }
+
+        // ------------------------------------------------------------ búsqueda de partida online
+        RectTransform _search; Text _searchTitle, _searchText; Button _onlineBtn;
+
+        void BuildSearchOverlay()
+        {
+            var shade = UiKit.Box(Root, "Searching", new Color(0f, 0f, 0f, 0.80f), false, true);
+            _search = shade.rectTransform;
+            UiKit.Stretch(_search);
+            var card = UiKit.Box(_search, "SearchPanel", UiKit.Panel);
+            UiKit.Place(card.rectTransform, 0.5f, 0.5f, 0, 0, 760, 380);
+            _searchTitle = UiKit.Label(card.transform, "BUSCANDO RIVAL…", 44, UiKit.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Place(_searchTitle.rectTransform, 0.5f, 1, 0, -26, 700, 64);
+            Deco.GoldTitle(_searchTitle);
+            _searchText = UiKit.Label(card.transform, "", 24, UiKit.TextCol, TextAnchor.UpperCenter);
+            UiKit.Place(_searchText.rectTransform, 0.5f, 1, 0, -112, 680, 150);
+            var cancel = UiKit.MakeButton(card.transform, "CANCELAR", new Color32(120, 50, 50, 255), () => { if (OnCancelSearch != null) OnCancelSearch(); }, 26);
+            UiKit.Place(cancel.GetComponent<RectTransform>(), 0.5f, 0, 0, 28, 300, 64);
+            _search.gameObject.SetActive(false);
+        }
+
+        /// <summary>Muestra u oculta la pantalla "Buscando rival…" (con el botón de cancelar).</summary>
+        public void ShowSearching(bool on, string title = null, string text = null)
+        {
+            if (_search == null) return;
+            _search.gameObject.SetActive(on);
+            if (!on) return;
+            _search.SetAsLastSibling();
+            if (title != null) _searchTitle.text = title;
+            if (text != null) _searchText.text = text;
         }
 
         /// <summary>Etiqueta pequeña encima de un campo. x = centro horizontal respecto al panel, y = distancia desde arriba (negativa).</summary>
@@ -195,6 +245,7 @@ namespace TimewarpTCG
         public void SetBusy(bool busy)
         {
             _play.interactable = !busy;
+            if (_onlineBtn != null) _onlineBtn.interactable = !busy;
             _login.interactable = !busy;
             _register.interactable = !busy;
             _edit.interactable = !busy;

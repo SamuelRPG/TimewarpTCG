@@ -16,7 +16,10 @@ namespace TimewarpTCG
         public bool faceDown;      // dorso (mano del rival)
         public bool hasOutline;    // borde de resalte (p. ej. posible objetivo)
         public Color outline;
-        public string badge;       // etiqueta pequeña arriba a la derecha ("OBJ", "MOV")
+        public string badge;       // etiqueta pequeña arriba a la derecha ("OBJ", "MOV", "JUGAR", "MOVER")
+        public Color badgeColor;   // color de la etiqueta (alfa 0 = dorado por defecto)
+        public string reason;      // si dim: motivo corto que se escribe sobre la carta ("SIN RECURSO", "ESPERA"...)
+        public bool costRed;       // el coste se pinta en rojo: no te llega el recurso
         public int count;          // si > 0, muestra "x N" (editor de mazos)
     }
 
@@ -82,7 +85,7 @@ namespace TimewarpTCG
 
             // ---- gema de coste
             float gem = 36 * k;
-            var cost = UiKit.CircleImage(inner.transform, "Cost", new Color32(60, 120, 230, 255));
+            var cost = UiKit.CircleImage(inner.transform, "Cost", st.costRed ? new Color32(205, 60, 60, 255) : new Color32(60, 120, 230, 255));
             UiKit.Place(cost.rectTransform, 0, 1, 1 * k, -1 * k, gem, gem);
             UiKit.AddOutline(cost, new Color(1, 1, 1, 0.55f), 1.5f);
             var costTxt = UiKit.Label(cost.transform, c.currentCost.ToString(), F(19), Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -157,9 +160,11 @@ namespace TimewarpTCG
             if (st.pending) badge = "MOV";
             if (!string.IsNullOrEmpty(badge))
             {
-                var b = UiKit.Box(inner.transform, "Badge", UiKit.Gold, true, false);
-                UiKit.Place(b.rectTransform, 1, 1, -3 * k, -3 * k, 38 * k, 17 * k);
-                var bt = UiKit.Label(b.transform, badge, F(10), Color.black, TextAnchor.MiddleCenter, FontStyle.Bold);
+                bool colored = st.badgeColor.a > 0.01f && !st.pending;
+                var b = UiKit.Box(inner.transform, "Badge", colored ? st.badgeColor : UiKit.Gold, true, false);
+                float bw = Mathf.Max(38f, badge.Length * 7.2f + 12f) * k;
+                UiKit.Place(b.rectTransform, 1, 1, -3 * k, -3 * k, bw, 17 * k);
+                var bt = UiKit.Label(b.transform, badge, F(10), colored ? Color.white : Color.black, TextAnchor.MiddleCenter, FontStyle.Bold);
                 UiKit.Stretch(bt.rectTransform);
             }
 
@@ -176,6 +181,15 @@ namespace TimewarpTCG
             {
                 var dim = UiKit.Box(inner.transform, "Dim", new Color(0.05f, 0.06f, 0.1f, 0.55f), true, false);
                 UiKit.Stretch(dim.rectTransform);
+                if (!string.IsNullOrEmpty(st.reason))
+                {
+                    // motivo sobre la carta: de un vistazo se sabe POR QUÉ no se puede jugar
+                    var rb = UiKit.Box(dim.transform, "Reason", new Color(0f, 0f, 0f, 0.62f), true, false);
+                    float rw = Mathf.Min(innerW - 2 * pad, Mathf.Max(60f, st.reason.Length * 8.4f + 14f) * k);
+                    UiKit.Place(rb.rectTransform, 0.5f, 0.5f, 0, 0, rw, 20 * k);
+                    var rt2 = UiKit.Label(rb.transform, st.reason, F(10.5f), new Color(1f, 0.82f, 0.82f), TextAnchor.MiddleCenter, FontStyle.Bold);
+                    UiKit.Stretch(rt2.rectTransform);
+                }
             }
 
             return view;
