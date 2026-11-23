@@ -60,8 +60,11 @@ public class GameState {
 
             spellCard.onPlaced(this, owner, opponent, spellCard.getCardLocation(), activeSpell.targets());
 
-            owner.getGraveyard().add(spellCard);
-            spellCard.setCardLocation(CardLocation.GRAVEYARD);
+            if (!activeSpell.trigger()) {
+                // un HECHIZO se gasta y va al cementerio; el efecto "al entrar" de una UNIDAD no mueve a la unidad (sigue en el tablero)
+                owner.getGraveyard().add(spellCard);
+                spellCard.setCardLocation(CardLocation.GRAVEYARD);
+            }
         }
 
         spellStack.clear();

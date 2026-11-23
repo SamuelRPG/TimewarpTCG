@@ -35,6 +35,11 @@ public class TriggeredEffect implements Effect {
     }
 
     @Override
+    public boolean onPlacedWouldDoSomething(List<Card> targets) {
+        return "ON_PLACED".equals(triggerEvent) && (!action.needsTargets() || (targets != null && !targets.isEmpty()));
+    }
+
+    @Override
     public void onDamageTaken(GameState game,Card card, Drive drive) {
         if ("ON_DAMAGE_TAKEN".equals(triggerEvent)) {
             action.execute(game, card, new ArrayList<>()); // No necesita targets externos

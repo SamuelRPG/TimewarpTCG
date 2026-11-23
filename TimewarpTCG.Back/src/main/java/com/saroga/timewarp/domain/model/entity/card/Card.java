@@ -123,6 +123,11 @@ public class Card {
         effects.forEach(e -> e.onDamageTaken(game, this, amount));
     }
 
+    /** ¿Tiene algun efecto "al entrar en juego" que haria algo con estos objetivos? (entonces va a la pila) */
+    public boolean onPlacedWouldDoSomething(List<Card> targets) {
+        return effects.stream().anyMatch(e -> e.onPlacedWouldDoSomething(targets));
+    }
+
     public void onPlaced(GameState game, PlayerState player, PlayerState opponent, CardLocation location, List<Card> targets) {
         effects.forEach(e -> e.onPlaced(game, this, player, opponent, location, targets));
     }

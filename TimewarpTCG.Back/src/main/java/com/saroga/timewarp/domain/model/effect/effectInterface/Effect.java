@@ -18,4 +18,10 @@ public interface Effect {
     default void beforeCombat(GameState game,Card card) {}
     default void onMovementConfirmed(GameState game,Card card, PlayerState owner, PlayerState opponent, CardLocation lane) {}
     default void onDestroyed(GameState game,Card card) {}
+
+    /**
+     * ¿Este efecto hace algo al entrar la carta en juego (ON_PLACED) con estos objetivos? Sirve para decidir si el efecto "al entrar"
+     * se pone en la PILA: si no haria nada (necesita objetivos y no hay), no se abre una pila inutil.
+     */
+    default boolean onPlacedWouldDoSomething(List<Card> targets) { return false; }
 }

@@ -156,6 +156,10 @@ public class TriggeredEffectsIntegrationTest {
         // 2. El Jugador A baja al Clérigo, TARGETEANDO AL OGRO (Trigger: ON_PLACED)
         cardPlayService.executePlay(game, playerAId, clericCard, CardLocation.MY_BASE, List.of(ogreCard));
 
+        // El efecto "al entrar en juego" va ahora a la PILA: se resuelve cuando los dos pasan seguidos (B responde pasando, luego A).
+        assertEquals(5, ogreCard.getDrive().value(), "el efecto del Clérigo aún está en la pila");
+        gameFlowService.confirmMoveAndPassPriority(game, playerBId, combatService);
+        gameFlowService.confirmMoveAndPassPriority(game, playerAId, combatService);
         // ¡VERIFICACIÓN CRÍTICA DEL TRIGGER ON_PLACED!
         assertEquals(7, ogreCard.getDrive().value(), "¡EL TRIGGER ON_PLACED FALLÓ! El Ogro debió recibir el buff del Clérigo");
         System.out.println("✅ Éxito: Trigger ON_PLACED -> " + ogreCard.getName() + " tiene ahora " + ogreCard.getDrive().value() + " de Drive.");

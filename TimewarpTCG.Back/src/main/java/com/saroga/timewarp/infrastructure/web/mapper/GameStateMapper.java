@@ -31,6 +31,13 @@ public class GameStateMapper {
             e.ownerId = q.card().getOwnerId();
             e.spellSpeed = q.card().getSpellSpeed().name();
             e.targetIds = q.targets().stream().map(t -> t.getId()).toList();
+            e.kind = q.trigger() ? "TRIGGER" : "SPELL";
+            e.description = q.card().getDescription();
+            e.currentCost = q.card().getCost().value();
+            e.faction = q.card().getFaction() == null ? null : q.card().getFaction().name();
+            e.cardType = q.card().getCardType().name();
+            e.keywords = q.card().getKeywords().stream().map(Enum::name).toList();
+            e.targetNames = q.targets().stream().map(t -> t.getName()).toList();
             return e;
         }).toList();
 

@@ -21,4 +21,7 @@ public class AllyBoostAction implements Action {
             }
         }
     }
+
+    @Override
+    public boolean needsTargets() { return true; }
 }

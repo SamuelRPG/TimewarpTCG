@@ -22,8 +22,12 @@ public class CardPlayService {
         actor.executePlayCard(card, destination);
 
         if (card.isUnit()) {
-            //disparar efectos de la carta al ser jugada
-            card.onPlaced(gameState, actor, opponent, destination, targets);
+            // El efecto "al entrar en juego" NO es inmediato: va a la PILA (como un hechizo) para que el rival pueda responder antes de que
+            // ocurra. La unidad ya esta en el tablero. Si el efecto no haria nada (p. ej. pide un objetivo y no hay), no se abre pila.
+            if (card.onPlacedWouldDoSomething(targets)) {
+                gameState.pushSpell(QueuedSpell.trigger(card, targets));
+                closePhase(gameState);
+            }
             gameState.resetConsecutivePasses();
             gameState.switchPriority();
         }
@@ -37,8 +41,7 @@ public class CardPlayService {
                 gameState.pushSpell(QueuedSpell.of(card, targets));
 
                 if (card.getSpellSpeed() == SpellSpeed.FAST) {
-                    if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
-                    if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
+                    closePhase(gameState);
                 }
                 else if (card.getSpellSpeed() == SpellSpeed.SLOW) {
                     if (gameState.getGamePhase() != GamePhase.MAIN_OPEN) throw new IllegalStateException("Slow solo en Main Open");
@@ -50,6 +53,12 @@ public class CardPlayService {
         }
         // unidades destruidas por el efecto recien jugado (ON_PLACED, hechizo INSTANT...) -> cementerio
         gameState.cleanupDestroyed();
+    }
+
+    /** Algo entra en la pila: la fase pasa a "cerrada" (solo respuestas con hechizos FAST/INSTANT). */
+    private void closePhase(GameState gameState) {
+        if (gameState.getGamePhase() == GamePhase.MAIN_OPEN) { gameState.setGamePhase(GamePhase.MAIN_CLOSED); }
+        else if (gameState.getGamePhase() == GamePhase.COMBAT_OPEN) { gameState.setGamePhase(GamePhase.COMBAT_CLOSED); }
     }
 
     public void validatePlayCard(GameState gameState, PlayerState actor, Card card, CardLocation destination, boolean isFieldContested, List<Card> targets) {

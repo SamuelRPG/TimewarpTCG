@@ -21,4 +21,7 @@ public class EnemyDamageAction implements Action {
             }
         }
     }
+
+    @Override
+    public boolean needsTargets() { return true; }
 }

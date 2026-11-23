@@ -52,6 +52,12 @@ public class BotBrainService {
             return;
         }
 
+        // Fase CERRADA (hay algo en la pila): solo se puede responder con hechizos. El bot no lanza hechizos: espera pasando.
+        if (game.getGamePhase() == GamePhase.MAIN_CLOSED || game.getGamePhase() == GamePhase.COMBAT_CLOSED) {
+            passPriorityUseCase.execute(game, bot.getPlayerId());
+            return;
+        }
+
         // --- REGLA 1: DEFENSA DE EMERGENCIA ---
         // Si el humano tiene tropas en FIELD_LEFT y yo no tengo a nadie defendiendo ahí
         if (human.hasUnitsIn(CardLocation.FIELD_LEFT) && !bot.hasUnitsIn(CardLocation.FIELD_LEFT)) {

@@ -28,6 +28,9 @@ public class GameFlowService {
         boolean hasSpells = !gameState.isStackEmpty();
 
         if (hasMovedUnits) {
+            if (hasSpells) {
+                throw new IllegalStateException("No puedes confirmar movimientos mientras hay algo en la pila.");
+            }
             resolvePendingMoves(gameState, actor);
             updatePhaseAfterMovement(gameState, combatService);
             actor.getPendingMoves().clear();

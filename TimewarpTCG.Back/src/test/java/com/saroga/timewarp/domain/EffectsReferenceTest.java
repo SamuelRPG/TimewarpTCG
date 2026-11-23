@@ -32,6 +32,7 @@ public class EffectsReferenceTest {
     private GameState game;
     private final CardPlayService play = new CardPlayService();
     private final CombatService combat = new CombatService();
+    private final com.saroga.timewarp.domain.service.GameFlowService flow = new com.saroga.timewarp.domain.service.GameFlowService();
     private final EffectFactory effects = new EffectFactory();
     private final TargetingFactory targeting = new TargetingFactory();
 
@@ -71,6 +72,16 @@ public class EffectsReferenceTest {
         return s;
     }
 
+    /**
+     * El efecto "al entrar en juego" de una unidad (y los hechizos FAST/SLOW) van a la PILA: se resuelven cuando los DOS pasan
+     * seguidos. Aqui pasa primero quien tiene la prioridad (el rival de quien jugo) y luego el otro.
+     */
+    private void resolveStack() {
+        flow.confirmMoveAndPassPriority(game, game.getActivePlayerId(), combat);
+        flow.confirmMoveAndPassPriority(game, game.getActivePlayerId(), combat);
+        assertTrue(game.isStackEmpty(), "la pila debe haberse resuelto");
+    }
+
     // ------------------------------------------------------------------ objetivos de las UNIDADES (ON_PLACED)
 
     @Test
@@ -87,7 +98,9 @@ public class EffectsReferenceTest {
         assertEquals(10, pA.getResource().value(), "ni gastado recurso");
 
         play.executePlay(game, a, tribune, CardLocation.MY_BASE, List.of(e1));
-        assertEquals(3, e1.getDrive().value(), "el objetivo legitimo recibe el dano");
+        assertEquals(5, e1.getDrive().value(), "el efecto 'al entrar' aun esta en la pila: todavia no hace dano");
+        resolveStack();
+        assertEquals(3, e1.getDrive().value(), "el objetivo legitimo recibe el dano al resolverse la pila");
         assertEquals(5, e2.getDrive().value());
     }
 
@@ -183,6 +196,7 @@ public class EffectsReferenceTest {
         Card prey = onBoard(pB, b, 1, CardLocation.FIELD_LEFT, "NONE", "NONE");
         Card hunter = inHand(pA, a, 3, "ON_PLACED:HUNTER_MARK:1:5", "1:ENEMY");
         play.executePlay(game, a, hunter, CardLocation.MY_BASE, List.of(prey));
+        resolveStack();
         assertTrue(prey.isDestroyed());
         assertEquals(8, hunter.getDrive().value(), "3 + 5");
     }
@@ -192,6 +206,7 @@ public class EffectsReferenceTest {
         Card prey = onBoard(pB, b, 4, CardLocation.FIELD_LEFT, "NONE", "NONE");
         Card hunter = inHand(pA, a, 3, "ON_PLACED:HUNTER_MARK:1:5", "1:ENEMY");
         play.executePlay(game, a, hunter, CardLocation.MY_BASE, List.of(prey));
+        resolveStack();
         assertEquals(3, prey.getDrive().value());
         assertEquals(3, hunter.getDrive().value(), "todavia no hay recompensa");
 
@@ -307,8 +322,122 @@ public class EffectsReferenceTest {
         Card ally = onBoard(pA, a, 3, CardLocation.MY_BASE, "NONE", "NONE");
         Card consul = inHand(pA, a, 6, "ON_PLACED:ENEMY_DAMAGE:3;ON_PLACED:ALLY_BOOST:3;ON_PLACED:DRAW:1", "1:ENEMY;1:ALLY");
         play.executePlay(game, a, consul, CardLocation.MY_BASE, List.of(enemy, ally));
+        resolveStack();
         assertEquals(3, enemy.getDrive().value());
         assertEquals(6, ally.getDrive().value());
         assertEquals(2, pA.getDeck().size(), "ha robado una carta");
+    }
+
+    // ------------------------------------------------------------------ la PILA: efectos "al entrar" y movimientos
+
+    @Test
+    void unitEnterEffectGoesOnTheStack_andTheUnitStaysOnTheBoard() {
+        Card enemy = onBoard(pB, b, 5, CardLocation.FIELD_LEFT, "NONE", "NONE");
+        Card tribune = inHand(pA, a, 5, "ON_PLACED:ENEMY_DAMAGE:2", "1:ENEMY");
+
+        play.executePlay(game, a, tribune, CardLocation.MY_BASE, List.of(enemy));
+
+        assertFalse(game.isStackEmpty(), "el efecto 'al entrar' esta en la pila");
+        assertEquals(1, game.getSpellStack().size());
+        assertTrue(game.getSpellStack().get(0).trigger(), "es una entrada de unidad, no un hechizo");
+        assertEquals(tribune, game.getSpellStack().get(0).card());
+        assertEquals(GamePhase.MAIN_CLOSED, game.getGamePhase(), "la fase se cierra: solo respuestas");
+        assertTrue(pB.hasPriority(), "el rival puede responder");
+        assertEquals(CardLocation.MY_BASE, tribune.getCardLocation(), "la unidad ya esta en el tablero");
+        assertEquals(5, enemy.getDrive().value(), "pero el efecto aun no ha ocurrido");
+
+        resolveStack();
+        assertEquals(3, enemy.getDrive().value());
+        assertEquals(CardLocation.MY_BASE, tribune.getCardLocation(), "resolver el efecto NO manda la unidad al cementerio");
+        assertTrue(pA.getBase().contains(tribune));
+        assertEquals(GamePhase.MAIN_OPEN, game.getGamePhase(), "la fase vuelve a abrirse");
+    }
+
+    @Test
+    void entryEffectThatWouldDoNothing_doesNotOpenTheStack() {
+        Card tribune = inHand(pA, a, 5, "ON_PLACED:ENEMY_DAMAGE:2", "1:ENEMY");     // sin objetivos: no hace nada
+        play.executePlay(game, a, tribune, CardLocation.MY_BASE, List.of());
+        assertTrue(game.isStackEmpty(), "no hay pila inutil");
+        assertEquals(GamePhase.MAIN_OPEN, game.getGamePhase());
+        assertTrue(pB.hasPriority(), "la prioridad pasa al rival como siempre");
+
+        fillDeck(pA, 2);
+        Card sirvient = inHand(pA, a, 2, "ON_PLACED:DRAW:1", "NONE");               // robar no necesita objetivos: SI va a la pila
+        game.switchPriority();
+        play.executePlay(game, a, sirvient, CardLocation.MY_BASE, List.of());
+        assertEquals(1, game.getSpellStack().size());
+    }
+
+    @Test
+    void unitWithoutEntryEffect_neverUsesTheStack() {
+        Card legionary = inHand(pA, a, 3, "NONE", "NONE");
+        play.executePlay(game, a, legionary, CardLocation.MY_BASE, List.of());
+        assertTrue(game.isStackEmpty());
+        assertEquals(GamePhase.MAIN_OPEN, game.getGamePhase());
+    }
+
+    @Test
+    void rivalCanRespondToAnEntryEffect_andTheLastThingPutOnTheStackResolvesFirst() {
+        Card enemy = onBoard(pB, b, 5, CardLocation.FIELD_LEFT, "NONE", "NONE");
+        Card ally = onBoard(pA, a, 3, CardLocation.MY_BASE, "NONE", "NONE");
+        Card priest = inHand(pA, a, 3, "ON_PLACED:ALLY_BOOST:2", "1:ALLY");
+        play.executePlay(game, a, priest, CardLocation.MY_BASE, List.of(ally));         // abajo de la pila: +2 al aliado
+
+        // B responde con un hechizo rapido que hace 4 de dano al mismo aliado (arriba de la pila)
+        Card zap = spellInHand(pB, SpellSpeed.FAST, "ON_PLACED:ENEMY_DAMAGE:4", "1:ENEMY");
+        play.executePlay(game, b, zap, CardLocation.MY_BASE, List.of(ally));
+        assertEquals(2, game.getSpellStack().size());
+
+        resolveStack();
+        // Si primero se resuelve lo ultimo lanzado (4 de dano a un aliado de 3) el aliado muere y el +2 llega tarde.
+        // Si fuese al reves (+2 primero: 5, luego -4) sobreviviria con 1.
+        assertTrue(ally.isDestroyed(), "la pila se resuelve de ARRIBA a ABAJO: el hechizo de respuesta va antes");
+        assertEquals(5, enemy.getDrive().value());
+    }
+
+    @Test
+    void entryEffectStillResolvesIfItsUnitDiesInResponse() {
+        Card enemy = onBoard(pB, b, 5, CardLocation.FIELD_LEFT, "NONE", "NONE");
+        Card tribune = inHand(pA, a, 2, "ON_PLACED:ENEMY_DAMAGE:2", "1:ENEMY");
+        play.executePlay(game, a, tribune, CardLocation.MY_BASE, List.of(enemy));
+
+        Card kill = spellInHand(pB, SpellSpeed.FAST, "ON_PLACED:ENEMY_DAMAGE:9", "1:ENEMY");
+        play.executePlay(game, b, kill, CardLocation.MY_BASE, List.of(tribune));        // B mata a la unidad en respuesta
+        resolveStack();
+        assertTrue(tribune.isDestroyed());
+        assertEquals(3, enemy.getDrive().value(), "el efecto ya estaba en la pila y se resuelve igualmente");
+    }
+
+    @Test
+    void moveIsRejectedWhileTheStackHasSomething_butAllowedWhenItIsOpen() {
+        var moves = new com.saroga.timewarp.application.service.PlayerInGameActions.MoveCard.MoveCardService(flow, combat);
+        Card mover = onBoard(pB, b, 3, CardLocation.MY_BASE, "NONE", "NONE");
+        mover.ready();                                    // las unidades recien puestas estan agotadas hasta el turno siguiente
+        onBoard(pA, a, 4, CardLocation.FIELD_LEFT, "NONE", "NONE");
+
+        Card zap = spellInHand(pA, SpellSpeed.FAST, "ON_PLACED:ENEMY_DAMAGE:1", "1:ENEMY");
+        Card target = onBoard(pB, b, 6, CardLocation.FIELD_RIGHT, "NONE", "NONE");
+        play.executePlay(game, a, zap, CardLocation.MY_BASE, List.of(target));           // hay un hechizo en la pila
+
+        assertTrue(pB.hasPriority());
+        var e = assertThrows(IllegalStateException.class, () -> moves.execute(game, b, mover.getId(), CardLocation.FIELD_LEFT));
+        assertTrue(e.getMessage().contains("pila"), e.getMessage());
+        assertEquals(CardLocation.MY_BASE, mover.getCardLocation(), "la unidad no se ha movido");
+        assertTrue(pB.getPendingMoves().isEmpty());
+
+        resolveStack();                                                                  // la pila se resuelve y la fase se abre
+        assertTrue(pB.hasPriority(), "tras resolver la pila el rival tiene la prioridad");
+        assertDoesNotThrow(() -> moves.execute(game, b, mover.getId(), CardLocation.FIELD_LEFT));
+        assertEquals(CardLocation.FIELD_LEFT, mover.getCardLocation(), "con la fase abierta si puede mover");
+    }
+
+    @Test
+    void confirmingStagedMovesWithSomethingOnTheStack_isRejected() {
+        Card mover = onBoard(pA, a, 3, CardLocation.MY_BASE, "NONE", "NONE");
+        mover.ready();
+        pA.moveCard(mover, CardLocation.FIELD_LEFT);                                      // movimiento ya preparado
+        game.pushSpell(com.saroga.timewarp.domain.model.vo.gameState.QueuedSpell.of(
+                spellInHand(pB, SpellSpeed.FAST, "ON_PLACED:DRAW:1", "NONE"), List.of()));
+        assertThrows(IllegalStateException.class, () -> flow.confirmMoveAndPassPriority(game, a, combat));
     }
 }
